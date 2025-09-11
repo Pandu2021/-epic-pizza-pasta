@@ -23,6 +23,10 @@ secrets/
 *.pem
 *.key
 *.crt
+# Docker compose environment files
+docker-compose.env
+*docker-compose*.env
+!*docker-compose*.env.example
 
 # Package managers
 node_modules/

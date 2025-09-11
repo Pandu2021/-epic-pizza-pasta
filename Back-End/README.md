@@ -33,20 +33,23 @@ This backend is a secure NestJS + Prisma + PostgreSQL service with PromptPay sup
 
 ## Quick start (Windows PowerShell)
 1. Copy `.env.example` to `.env` and adjust values.
-2. Start infra:
-   - `docker compose up -d`  (from this folder)
-3. Install deps & generate Prisma client:
+2. Set up Docker Compose environment:
+   - Copy `docker-compose.env.example` to `docker-compose.env`
+   - Set secure database credentials in `docker-compose.env`
+3. Start infra:
+   - `docker compose --env-file docker-compose.env up -d`  (from this folder)
+4. Install deps & generate Prisma client:
    - `npm ci`
    - `npm run prisma:migrate`
-4. Run dev:
+5. Run dev:
    - `npm run start:dev`
 
 API will be at http://localhost:4000
 
 PostgreSQL (Docker Compose)
-- User: pizza
-- Password: PgAdmin#Pizza25
-- DB name: postgres
+- User: Set in docker-compose.env (default: pizza)
+- Password: Set in docker-compose.env (secure password required)
+- DB name: Set in docker-compose.env (default: epic_pizza)
 
 ### Seed menu data (optional)
 To load initial menu items into PostgreSQL:
@@ -60,8 +63,16 @@ This upserts items by `id` when provided.
    - JWT_PRIVATE_KEY, JWT_PUBLIC_KEY, JWT_ACCESS_TTL, JWT_REFRESH_TTL
    - COOKIE_SECRET, CSRF_SECRET
    - CORS_ORIGINS
+- Database credentials: Use `docker-compose.env` for database configuration (never commit actual credentials)
+- Docker production: Environment variables are injected at runtime (no .env files in production images)
 - CSRF flow: client hits `GET /api/auth/csrf` to obtain `XSRF-TOKEN` cookie, then sends token in `X-CSRF-Token` header for non-GET requests.
 - Auth: `POST /api/auth/login` sets HttpOnly cookies `access_token` and `refresh_token`. Use `GET /api/auth/me` to fetch the current user. `POST /api/auth/refresh` rotates access token.
+
+### Production deployment security
+- Use proper secret management (Kubernetes secrets, Docker secrets, etc.)
+- Never include actual `.env` files in Docker images
+- Inject environment variables at runtime
+- Regular security audits and dependency updates
 
 ## API Contract (short)
 See `API-CONTRACT.md` for details.

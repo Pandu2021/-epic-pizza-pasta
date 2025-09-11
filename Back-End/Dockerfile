@@ -13,6 +13,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/.env ./.env
+# Note: Environment variables should be injected at runtime, not copied from .env files
+# Use: docker run -e DATABASE_URL=... -e JWT_PRIVATE_KEY=... your-image
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
