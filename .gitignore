@@ -1,0 +1,53 @@
+# Root ignore
+# Node & build artifacts
+tmp/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.env.local
+*.secret
+secrets/
+*.pem
+*.key
+*.crt
+
+# Package managers
+node_modules/
+
+# Logs
+logs/
+*.pid
+*.pid.lock
+package-lock.json.*
+yarn.lock.*
+pnpm-lock.yaml.*
+
+# Output / coverage
+dist/
+build/
+coverage/
+nyc-output/
+.cache/
+cache/
+tsbuildinfo.json
+*.tsbuildinfo
+
+# OS
+*.swp
+*.swo
+ehthumbs.db
+Icon?
+Desktop.ini

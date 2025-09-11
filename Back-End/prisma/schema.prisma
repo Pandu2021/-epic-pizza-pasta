@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("customer")
+  name         String?
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+}
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  category    String
+  name        Json
+  description Json?
+  images      String[]
+  priceL      Int?
+  priceXL     Int?
+  basePrice   Int
+  options     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OrderItem {
+  id            String  @id @default(uuid())
+  orderId       String
+  menuItemId    String?
+  nameSnapshot  String
+  priceSnapshot Int
+  qty           Int
+  options       Json?
+  Order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  method        String
+  providerRefId String?
+  status        String   @default("pending")
+  promptpayQR   String?
+  paidAt        DateTime?
+  Order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  userId        String?
+  customerName  String
+  phone         String
+  address       String
+  lat           Float?
+  lng           Float?
+  items         OrderItem[]
+  subtotal      Int
+  deliveryFee   Int
+  discount      Int   @default(0)
+  tax           Int   @default(0)
+  total         Int
+  paymentMethod String
+  payment       Payment?
+  status        String      @default("received")
+  deliveryType  String      @default("delivery")
+  distanceKm    Float?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  User          User?       @relation(fields: [userId], references: [id])
+}
+
+model WebhookEvent {
+  id        String   @id @default(uuid())
+  type      String
+  payload   Json
+  signature String?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,116 @@
+{
+  "menu": "Menu",
+  "cart": "Cart",
+  "admin": "Admin",
+  "welcome": "Welcome to Epic Pizza & Pasta",
+  "promptpay_qr": "PromptPay QR",
+  "order_now": "Order Now",
+  "browse_categories": "Browse Categories",
+  "search_placeholder": "Search menu...",
+
+  "home": "Home",
+  "contact": "Contact",
+  "popular_categories": "Popular Categories",
+  "our_menu": "Our Menu",
+  "menu_hero_subtitle": "Freshly made pizzas, pastas, and more—crafted daily in Nonthaburi.",
+  "hero_subtitle": "Epic flavors, endless choices—get fresh Italian classics delivered fast in Nonthaburi.",
+
+  "category": {
+    "pizza": "Pizza",
+    "pasta": "Pasta",
+    "appetizer": "Appetizer",
+    "salad": "Salad",
+    "dessert": "Dessert"
+  },
+
+  "add_to_cart": "Add to cart",
+  "choose_options": "Choose Options",
+  "from": "From",
+  "best_seller": "Best Seller",
+  "new": "New",
+  "no_image": "No image",
+
+  "your_cart": "Your Cart",
+  "close": "Close",
+  "cart_empty": "Your cart is empty",
+  "remove": "Remove",
+  "total": "Total",
+  "checkout": "Checkout",
+
+  "hours_bangkok": "Hours (Asia/Bangkok)",
+  "today": "Today",
+  "open": "Open",
+  "closed": "Closed",
+  "reach_out": "Reach Out",
+  "made_with_love": "Made with love in Nonthaburi",
+  "all_rights_reserved": "All rights reserved.",
+  "sun_to_sat": "Sun - Sat",
+  "days": {
+    "sunday": "Sunday",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday"
+  },
+
+  "get_in_touch": "Get in Touch",
+  "contact_subtitle": "We’d love to hear from you—find us in Nonthaburi or drop a message.",
+  "phone": "Phone",
+  "email": "Email",
+  "address": "Address"
+  ,
+  "profile": {
+    "title": "Your Profile",
+    "subtitle": "Manage your preferences and view quick info.",
+    "account": "Account",
+    "loading": "Loading...",
+    "display_name": "Display Name",
+    "role": "Role",
+    "settings": "Settings",
+    "logout": "Logout",
+    "edit_profile": "Edit profile",
+    "name": "Name",
+    "phone": "Phone",
+    "placeholder_name": "Your name",
+    "placeholder_phone": "08xxxxxxxx",
+    "saving": "Saving…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "not_signed_in": "Not signed in",
+    "login": "Login",
+    "register": "Register",
+    "preferences": "Preferences",
+    "language": "Language",
+    "authentication": "Authentication",
+    "signed_in": "Signed in",
+    "profile_completion": "Profile Completion",
+    "profile_complete_msg": "Your profile is {{percent}}% complete!",
+    "profile_tip_name_phone": "Add your name and phone to complete it.",
+    "profile_tip_phone": "Add your phone number to complete it.",
+    "quick_links": "Quick Links",
+    "browse_menu": "Browse Menu",
+    "view_cart": "View Cart",
+    "signin_note": "Sign-in and advanced account features can be added later."
+  },
+  "carousel": {
+    "slides": [
+      {
+        "title": "A True Taste of Italy in Thailand",
+        "description": "Epic Pizza & Pasta is a slice of Italy right in Nonthaburi. This family-run spot enchants guests with authentic Italian cuisine, lovingly crafted from the finest ingredients.",
+        "image": "pizza-ricotta-sausage.jpg"
+      },
+      {
+        "title": "Authentic Culinary Commitment",
+        "description": "Every bite shows our dedication to excellence—fresh mozzarella and handmade pasta elevate your meal.",
+        "image": "pasta-chicken-parmigiana.jpg"
+      },
+      {
+        "title": "Family Legacy and Tradition",
+        "description": "In the heart of Nonthaburi, we celebrate Italy's culinary heritage, brought to life by a passionate family dedicated to flavor.",
+        "image": "app-potato-soup.jpg"
+      }
+    ]
+  }
+}

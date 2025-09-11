@@ -1,0 +1,30 @@
+# Front-End ignore
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.env.local
+*.secret
+secrets/
+*.pem
+*.key
+coverage/
+*.log
+.pid
+.pid.lock
+logs/
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/tasks.json
+
+# Editor / system
+*.swp
+*.swo
+ehthumbs.db
+Icon?
+Desktop.ini
+*.tsbuildinfo
+.cache/
+cache/

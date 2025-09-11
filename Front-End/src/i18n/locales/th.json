@@ -1,0 +1,116 @@
+{
+  "menu": "เมนู",
+  "cart": "ตะกร้า",
+  "admin": "ผู้ดูแล",
+  "welcome": "ยินดีต้อนรับสู่ Epic Pizza & Pasta",
+  "promptpay_qr": "คิวอาร์พร้อมเพย์",
+  "order_now": "สั่งตอนนี้",
+  "browse_categories": "ดูหมวดหมู่",
+  "search_placeholder": "ค้นหาเมนู...",
+
+  "home": "หน้าแรก",
+  "contact": "ติดต่อ",
+  "popular_categories": "หมวดหมู่ยอดนิยม",
+  "our_menu": "เมนูของเรา",
+  "menu_hero_subtitle": "พิซซ่า พาสต้า และอีกมากมาย ทำสดใหม่ทุกวันในนนทบุรี",
+  "hero_subtitle": "รสชาติสุดเอพิค ตัวเลือกหลากหลาย — อาหารอิตาเลียนสดใหม่ ส่งด่วนในนนทบุรี",
+
+  "category": {
+    "pizza": "พิซซ่า",
+    "pasta": "พาสต้า",
+    "appetizer": "อาหารเรียกน้ำย่อย",
+    "salad": "สลัด",
+    "dessert": "ของหวาน"
+  },
+
+  "add_to_cart": "ใส่ตะกร้า",
+  "choose_options": "เลือกตัวเลือก",
+  "from": "เริ่มต้นที่",
+  "best_seller": "ขายดี",
+  "new": "ใหม่",
+  "no_image": "ไม่มีรูปภาพ",
+
+  "your_cart": "ตะกร้าของคุณ",
+  "close": "ปิด",
+  "cart_empty": "ตะกร้าของคุณว่างเปล่า",
+  "remove": "ลบ",
+  "total": "รวม",
+  "checkout": "ชำระเงิน",
+
+  "hours_bangkok": "เวลาเปิดทำการ (เอเชีย/กรุงเทพฯ)",
+  "today": "วันนี้",
+  "open": "เปิด",
+  "closed": "ปิด",
+  "reach_out": "ติดต่อเรา",
+  "made_with_love": "สร้างด้วยความรักในนนทบุรี",
+  "all_rights_reserved": "สงวนลิขสิทธิ์",
+  "sun_to_sat": "อา - ส",
+  "days": {
+    "sunday": "อาทิตย์",
+    "monday": "จันทร์",
+    "tuesday": "อังคาร",
+    "wednesday": "พุธ",
+    "thursday": "พฤหัสบดี",
+    "friday": "ศุกร์",
+    "saturday": "เสาร์"
+  },
+
+  "get_in_touch": "ติดต่อเรา",
+  "contact_subtitle": "ยินดีรับฟังความคิดเห็น ค้นหาเราได้ที่นนทบุรีหรือส่งข้อความมาได้เลย",
+  "phone": "โทร",
+  "email": "อีเมล",
+  "address": "ที่อยู่"
+  ,
+  "profile": {
+    "title": "โปรไฟล์ของคุณ",
+    "subtitle": "จัดการการตั้งค่าและดูข้อมูลอย่างรวดเร็ว",
+    "account": "บัญชี",
+    "loading": "กำลังโหลด...",
+    "display_name": "ชื่อที่แสดง",
+    "role": "สิทธิ์",
+    "settings": "การตั้งค่า",
+    "logout": "ออกจากระบบ",
+    "edit_profile": "แก้ไขโปรไฟล์",
+    "name": "ชื่อ",
+    "phone": "โทรศัพท์",
+    "placeholder_name": "ชื่อของคุณ",
+    "placeholder_phone": "08xxxxxxxx",
+    "saving": "กำลังบันทึก…",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "not_signed_in": "ยังไม่ได้เข้าสู่ระบบ",
+    "login": "เข้าสู่ระบบ",
+    "register": "สมัครสมาชิก",
+    "preferences": "การตั้งค่า",
+    "language": "ภาษา",
+    "authentication": "การรับรองตัวตน",
+    "signed_in": "เข้าสู่ระบบแล้ว",
+    "profile_completion": "ความสมบูรณ์ของโปรไฟล์",
+    "profile_complete_msg": "โปรไฟล์ของคุณสมบูรณ์ {{percent}}%",
+    "profile_tip_name_phone": "เพิ่มชื่อและเบอร์โทรเพื่อให้สมบูรณ์",
+    "profile_tip_phone": "เพิ่มหมายเลขโทรศัพท์เพื่อให้สมบูรณ์",
+    "quick_links": "ลิงก์ด่วน",
+    "browse_menu": "ดูเมนู",
+    "view_cart": "ดูตะกร้า",
+    "signin_note": "สามารถเพิ่มฟีเจอร์บัญชีขั้นสูงภายหลังได้"
+  },
+  "carousel": {
+    "slides": [
+      {
+        "title": "รสชาติอิตาเลียนแท้ในประเทศไทย",
+        "description": "Epic Pizza & Pasta คืออิตาลีชิ้นหนึ่งในนนทบุรี ร้านของครอบครัวที่รังสรรค์อาหารอิตาเลียนแท้ ด้วยวัตถุดิบคุณภาพอย่างใส่ใจ",
+        "image": "pizza-ricotta-sausage.jpg"
+      },
+      {
+        "title": "ความมุ่งมั่นต่อความแท้จริง",
+        "description": "ทุกคำคือความทุ่มเท—มอซซาเรลลาสดและพาสต้าโฮมเมดยกระดับมื้ออาหารของคุณ",
+        "image": "pasta-chicken-parmigiana.jpg"
+      },
+      {
+        "title": "ตำนานและประเพณีของครอบครัว",
+        "description": "ใจกลางนนทบุรี เราเฉลิมฉลองมรดกอาหารอิตาเลียน ถ่ายทอดโดยครอบครัวที่เต็มไปด้วยแพสชัน",
+        "image": "app-potato-soup.jpg"
+      }
+    ]
+  }
+}
