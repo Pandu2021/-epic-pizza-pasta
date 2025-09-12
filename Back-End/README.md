@@ -44,9 +44,9 @@ This backend is a secure NestJS + Prisma + PostgreSQL service with PromptPay sup
 API will be at http://localhost:4000
 
 PostgreSQL (Docker Compose)
-- User: pizza
-- Password: PgAdmin#Pizza25
-- DB name: postgres
+- Configured via `.env` (see `.env.example`: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
+- Ports are bound to localhost only: 127.0.0.1:5432
+- Prisma uses `DATABASE_URL` which should match the above values
 
 ### Seed menu data (optional)
 To load initial menu items into PostgreSQL:

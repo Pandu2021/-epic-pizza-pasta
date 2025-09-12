@@ -23,6 +23,13 @@ This checklist covers backend services, APIs, integrations, and deployment readi
 - [ ] Implement CORS policy and rate limiting on API endpoints.
 - [ ] Use HTTPS and secure cookie/session handling (if sessions used).
 
+### Secret rotation runbook (dev/staging)
+- [ ] Generate a new strong Postgres password; update `POSTGRES_PASSWORD` in `.env` and `DATABASE_URL` to match.
+- [ ] Restart database: `docker compose up -d db` (from `Back-End/`).
+- [ ] Recreate Prisma client if needed: `npm run prisma:generate`.
+- [ ] Verify API can connect (healthcheck, simple DB query).
+- [ ] In production, rotate credentials via managed secret store and rolling deploys.
+
 ## Reliability & Observability
 - [ ] Add logging of errors and order events (structured logs).
 - [ ] Add basic health check endpoints for monitoring.
