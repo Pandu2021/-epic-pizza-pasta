@@ -52,12 +52,12 @@ export default function ProductPage() {
   const [qty, setQty] = useState<number>(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  // Set default size when item is loaded and is a pizza
+  // Set default size when item is loaded and is a pizza; prefer L if available else XL
   useEffect(() => {
-    if (isPizza) {
-      setSize('L');
-    }
-  }, [isPizza]);
+    if (!item) return;
+    if (!isPizza) return;
+    if (item.priceL != null) setSize('L'); else if (item.priceXL != null) setSize('XL');
+  }, [item, isPizza]);
 
   const handleToggleExtra = (extra: Extra) => {
     setSelectedExtras((prev: Extra[]) =>
@@ -163,7 +163,7 @@ export default function ProductPage() {
                   onClick={() => setSize('L')}
                 >
                   <div className="text-xl font-bold">L</div>
-                  <div className="text-sm">฿ {item.priceL.toFixed(2)}</div>
+                  <div className="text-sm">฿ {item.priceL.toFixed(0)}</div>
                 </motion.button>
               )}
               {item.priceXL != null && (
@@ -174,7 +174,7 @@ export default function ProductPage() {
                   onClick={() => setSize('XL')}
                 >
                   <div className="text-xl font-bold">XL</div>
-                  <div className="text-sm">฿ {(item.priceXL ?? 0).toFixed(2)}</div>
+                  <div className="text-sm">฿ {(item.priceXL ?? 0).toFixed(0)}</div>
                 </motion.button>
               )}
             </div>
@@ -233,7 +233,7 @@ export default function ProductPage() {
             {/* Price */}
             <div className="text-right">
               <div className="text-sm text-slate-500">Total Price</div>
-              <div className="text-3xl font-bold">฿ {totalPrice.toFixed(2)}</div>
+              <div className="text-3xl font-bold">฿ {totalPrice.toFixed(0)}</div>
             </div>
           </div>
 

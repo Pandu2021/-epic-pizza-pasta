@@ -1,0 +1,30 @@
+###############################
+# SPA routing for React + Vite
+###############################
+
+RewriteEngine On
+
+# Redirect to HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Serve existing files directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Otherwise, hand off to index.html (client-side routing)
+RewriteRule ^ index.html [L]
+
+# Optional caching for static assets (tune as needed)
+<IfModule mod_expires.c>
+	ExpiresActive On
+	ExpiresByType text/css "access plus 1 month"
+	ExpiresByType application/javascript "access plus 1 month"
+	ExpiresByType application/json "access plus 1 hour"
+	ExpiresByType image/svg+xml "access plus 1 month"
+	ExpiresByType image/webp "access plus 1 month"
+	ExpiresByType image/png "access plus 1 month"
+	ExpiresByType image/jpeg "access plus 1 month"
+	ExpiresByType image/gif "access plus 1 month"
+</IfModule>

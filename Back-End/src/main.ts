@@ -12,6 +12,10 @@ import type { Request, Response, NextFunction } from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
+  // When running behind cPanel/Apache (Passenger) or any reverse proxy
+  // ensure Express trusts proxy headers for correct protocol/IP handling
+  (app as any).set('trust proxy', 1);
+
   app.use(helmet({
     // Disable strict CSP by default; consider enabling with allowlist if front-end domains are known
     contentSecurityPolicy: false,

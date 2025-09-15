@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 
 export class OrderItemDto {
   @IsString()
@@ -29,8 +29,8 @@ export class CustomerDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsPhoneNumber('TH')
-  phone!: string;
+  @MinLength(6)
+  phone!: string; // relaxed validation for local dev (accepts 08xxxxxxxx or +66 formats)
 
   @IsString()
   @IsNotEmpty()

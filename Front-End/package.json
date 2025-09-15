@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node -e \"const fs=require('fs'),p=require('path');const src=p.join('public','.htaccess');const dst=p.join('dist','.htaccess');if(fs.existsSync(src)){fs.copyFileSync(src,dst);console.log('Copied .htaccess to dist/');}\"",
     "preview": "vite preview --port 5173",
     "test": "vitest",
     "test:ui": "vitest --ui",

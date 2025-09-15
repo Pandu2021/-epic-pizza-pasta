@@ -27,8 +27,8 @@ export const menuItems: MenuItem[] = [
       en: "We start with our special seasoned tomato sauce... simple, savory, and absolutely satisfying.",
       th: 'เราเริ่มด้วยซอสมะเขือเทศปรุงรสสูตรพิเศษ... เรียบง่าย อร่อยกลมกล่อม และน่าพึงพอใจในทุกคำ'
     },
-    priceXL: 495,
-    priceL: 359,
+  priceXL: 495,
+  priceL: 349,
     image: img('pizza-cheese.jpg')
   },
   {
@@ -39,8 +39,8 @@ export const menuItems: MenuItem[] = [
       en: 'Seasoned tomato sauce topped with cheese, onions, mushrooms, peppers, and ripe tomatoes.',
       th: 'ซอสมะเขือเทศปรุงรส ท็อปด้วยชีส หอมหัวใหญ่ เห็ด พริกหวาน และมะเขือเทศสุก'
     },
-    priceXL: 495,
-    priceL: 359,
+  priceXL: 495,
+  priceL: 349,
     image: img('pizza-veggie.jpg')
   },
   {
@@ -51,8 +51,8 @@ export const menuItems: MenuItem[] = [
       en: 'House-made mozzarella, signature tomato sauce, hand-stretched dough, and fresh basil.',
       th: 'มอซซาเรลล่าชีสทำเอง ซอสมะเขือเทศสูตรพิเศษ แป้งยืดมือ และโหระพาสด'
     },
-    priceXL: 505,
-    priceL: 369,
+  priceXL: 505,
+  priceL: 359,
     labels: ['bestseller'],
     image: img('pizza-margherita.jpg')
   },
@@ -64,8 +64,8 @@ export const menuItems: MenuItem[] = [
       en: 'House-made basil pesto, tender chicken breast, melted mozzarella over seasoned sauce.',
       th: 'เพสโตโหระพาโฮมเมด ไก่อกนุ่ม มอซซาเรลล่าบนซอสมะเขือเทศปรุงรส'
     },
-    priceXL: 535,
-    priceL: 369,
+  priceXL: 535,
+  priceL: 369,
     image: img('pizza-pesto-chicken.jpg')
   },
   {
@@ -76,8 +76,8 @@ export const menuItems: MenuItem[] = [
       en: 'Pineapple with lightly salty ham over seasoned tomato sauce and mozzarella.',
       th: 'สับปะรดฉ่ำคู่แฮมเค็มเล็กน้อย บนซอสมะเขือเทศปรุงรสและมอซซาเรลล่า'
     },
-    priceXL: 505,
-    priceL: 369,
+  priceXL: 505,
+  priceL: 359,
     labels: ['bestseller'],
     image: img('pizza-hawaiian.jpg')
   },
@@ -89,8 +89,8 @@ export const menuItems: MenuItem[] = [
       en: 'House-made ricotta, Italian sausage, sweet onions over tomato sauce and mozzarella.',
       th: 'ริคอตต้าชีสโฮมเมด ไส้กรอกอิตาเลียน หอมหัวใหญ่หวาน บนซอสมะเขือเทศและมอซซาเรลล่า'
     },
-    priceXL: 535,
-    priceL: 379,
+  priceXL: 535,
+  priceL: 369,
     image: img('pizza-ricotta-sausage.jpg')
   },
   {
@@ -101,8 +101,8 @@ export const menuItems: MenuItem[] = [
       en: 'Loaded with premium pepperoni over rich sauce and gooey mozzarella.',
       th: 'เปปเปอโรนีแน่น ๆ บนซอสมะเขือเทศเข้มข้นและมอซซาเรลล่าเยิ้ม'
     },
-    priceXL: 495,
-    priceL: 379,
+  priceXL: 505,
+  priceL: 359,
     labels: ['bestseller'],
     image: img('pizza-pepperoni.jpg')
   },
@@ -114,8 +114,8 @@ export const menuItems: MenuItem[] = [
       en: 'Pepperoni, Italian sausage, and ham over rich sauce and mozzarella.',
       th: 'เปปเปอโรนี ไส้กรอกอิตาเลียน และแฮมบนซอสมะเขือเทศเข้มข้นและมอซซาเรลล่า'
     },
-    priceXL: 505,
-    priceL: 379,
+  priceXL: 535,
+  priceL: 379,
     image: img('pizza-meat-lovers.jpg')
   },
   {
@@ -126,8 +126,8 @@ export const menuItems: MenuItem[] = [
       en: 'Shrimp, squid, and crab over special tomato sauce with mozzarella.',
       th: 'กุ้ง ปลาหมึก และปูบนซอสมะเขือเทศสูตรพิเศษ โรยมอซซาเรลล่า'
     },
-    priceXL: 535,
-    priceL: 389,
+  priceXL: 535,
+  priceL: 379,
     image: img('pizza-seafood.jpg')
   },
   {
@@ -138,9 +138,20 @@ export const menuItems: MenuItem[] = [
       en: 'Custom tomato sauce, cheese, champignon mushrooms, black truffles, EVOO.',
       th: 'ซอสมะเขือเทศสูตรพิเศษ ชีส เห็ดแชมปิญอง ทรัฟเฟิลดำ และน้ำมันมะกอกเอ็กซ์ตร้าเวอร์จิน'
     },
-    priceXL: 535,
-    priceL: 389,
+  priceXL: 535,
+  priceL: 379,
     image: img('pizza-truffle.jpg')
+  },
+  {
+    id: 'pizza-super-sampler',
+    category: 'pizza',
+    name: { en: 'Super Sampler (XL only)', th: 'ซูเปอร์แซมเปลอร์ (XL เท่านั้น)' },
+    description: {
+      en: 'XL 15\" only. Choose up to 4 flavors (every 2 slices).',
+      th: 'มีเฉพาะขนาด XL 15\" เลือกได้สูงสุด 4 รสชาติ (ทุก 2 ชิ้น)'
+    },
+    priceXL: 550,
+    image: img('pizza-hawaiian.jpg')
   },
   // Pasta
   {

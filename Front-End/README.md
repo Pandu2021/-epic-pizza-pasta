@@ -36,3 +36,6 @@ Create `.env` with:
 
 ---
 This scaffold aligns with the project summary and can be wired to backend endpoints when ready.
+
+Deployment
+- For cPanel (Apache) deployment and SPA routing, see the root `DEPLOYMENT.md`.

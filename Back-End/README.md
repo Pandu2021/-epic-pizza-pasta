@@ -65,3 +65,7 @@ This upserts items by `id` when provided.
 
 ## API Contract (short)
 See `API-CONTRACT.md` for details.
+
+---
+Deployment
+- For step-by-step cPanel deployment instructions, see the root `DEPLOYMENT.md`.

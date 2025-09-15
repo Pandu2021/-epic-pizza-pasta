@@ -5,11 +5,13 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 
 type Props = {
-  name: string;
+  name: string | JSX.Element;
   price: number;
+  priceL?: number;
+  priceXL?: number;
   imageUrl?: string;
   label?: 'bestseller' | 'spicy' | 'new';
-  description?: string;
+  description?: string | JSX.Element;
   /** Quick add handler (no options). If omitted and `to` exists + variant = 'options', button will navigate instead */
   onAdd?: () => void;
   /** Link to detail page */
@@ -17,7 +19,7 @@ type Props = {
   /** Behaviour of the main CTA. 'quick-add' keeps old behaviour, 'options' navigates to detail page */
   variant?: 'quick-add' | 'options';
 };
-export default function ProductCard({ name, price, imageUrl, label, description, onAdd, to, variant = 'quick-add' }: Props) {
+export default function ProductCard({ name, price, priceL, priceXL, imageUrl, label, description, onAdd, to, variant = 'quick-add' }: Props) {
   const { t } = useTranslation();
   const [added, setAdded] = useState(false);
   const navigate = useNavigate();
@@ -65,13 +67,23 @@ export default function ProductCard({ name, price, imageUrl, label, description,
           </div>
           {description && (
             <p className="mt-1 text-sm text-slate-600">
-              {description.length > 100 ? `${description.slice(0, 100)}…` : description}
+              {typeof description === 'string' ? (
+                description.length > 100 ? `${description.slice(0, 100)}…` : description
+              ) : (
+                description
+              )}
             </p>
           )}
         </div>
         <div className="mt-4">
           <div className="text-sm text-slate-500">{t('from')}</div>
-          <div className="mt-0.5 text-lg font-semibold">฿ {price.toFixed(2)}</div>
+          <div className="mt-0.5 text-lg font-semibold">
+            {priceL != null && priceXL != null ? (
+              <span>฿ {priceL.toFixed(0)} / {priceXL.toFixed(0)}</span>
+            ) : (
+              <span>฿ {price.toFixed(0)}</span>
+            )}
+          </div>
           <button
             className={`btn w-full mt-3 transition-colors duration-300 ${
               added ? 'bg-emerald-500 hover:bg-emerald-600' : 'btn-primary'

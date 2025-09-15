@@ -16,7 +16,7 @@ export default function MenuPage() {
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { search } = useLocation();
+  const { search, hash } = useLocation();
   const query = useMemo(() => (new URLSearchParams(search).get('q') ?? '').trim(), [search]);
   
   // If navigated with a hash (e.g. /menu#cat-pizza), scroll to that section on mount
@@ -41,15 +41,21 @@ export default function MenuPage() {
         setLoading(false);
       }
     })();
-
-    const hash = window.location.hash;
-    if (hash) {
-      const id = hash.replace('#', '');
-      const el = document.getElementById(id);
-      // slight delay to ensure layout rendered
-      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
-    }
   }, [query]);
+
+  // After content is loaded/rendered, perform hash scroll (e.g., /menu#cat-pasta)
+  useEffect(() => {
+    if (loading) return;
+    if (!hash) return;
+    const id = hash.replace('#', '');
+    const doScroll = () => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    // Use rAF to wait for the paint after the items are rendered
+    const raf = requestAnimationFrame(() => setTimeout(doScroll, 0));
+    return () => cancelAnimationFrame(raf);
+  }, [loading, hash]);
 
   const groups: Array<{
     key: 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'dessert';
@@ -135,7 +141,9 @@ export default function MenuPage() {
                 <ProductCard
                   key={it.id}
                   name={highlight(typeof it.name === 'object' ? t(it.name) : (it.name || '')) as any}
-                  price={it.price ?? it.basePrice ?? (it.priceL ?? 0)}
+                  price={it.price ?? it.basePrice ?? it.priceL ?? it.priceXL ?? 0}
+                  priceL={it.priceL}
+                  priceXL={it.priceXL}
                   imageUrl={menuImg(((Array.isArray(it.images) && it.images[0]) || it.image))}
                   description={highlight(typeof it.description === 'object' ? t(it.description) : (it.description ?? '')) as any}
                   label={it.labels?.[0]}
@@ -163,7 +171,9 @@ export default function MenuPage() {
                   <ProductCard
                     key={it.id}
                     name={query ? (highlight(typeof it.name === 'object' ? t(it.name) : (it.name || '')) as any) : (typeof it.name === 'object' ? t(it.name) : (it.name || ''))}
-                    price={it.price ?? it.basePrice ?? (it.priceL ?? 0)}
+                    price={it.price ?? it.basePrice ?? it.priceL ?? it.priceXL ?? 0}
+                    priceL={it.priceL}
+                    priceXL={it.priceXL}
                     imageUrl={menuImg(((Array.isArray(it.images) && it.images[0]) || it.image))}
                     description={query ? (highlight(typeof it.description === 'object' ? t(it.description) : (it.description ?? '')) as any) : (typeof it.description === 'object' ? t(it.description) : (it.description ?? ''))}
                     label={it.labels?.[0]}
