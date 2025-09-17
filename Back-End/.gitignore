@@ -64,6 +64,9 @@ prisma/*.sqlite
 *.db
 dump/
 
+# Do not ignore Prisma migration files
+!prisma/migrations/**
+
 # Local package manager configs (may include tokens)
 .npmrc
 .yarnrc
