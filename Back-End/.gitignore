@@ -45,3 +45,34 @@ tsbuildinfo.json
 # Runtime pids
 *.pid
 *.pid.lock
+
+# Additional caches & lint artifacts
+.eslintcache
+.turbo/
+.parcel-cache/
+
+# More certificate/key formats
+*.pfx
+*.p12
+*.der
+
+# Local DB/dumps (in case of sqlite/dev dumps)
+prisma/*.db
+prisma/*.sqlite
+*.sql
+*.sqlite
+*.db
+dump/
+
+# Local package manager configs (may include tokens)
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# Backups / temp files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+~*

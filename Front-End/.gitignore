@@ -28,3 +28,27 @@ Desktop.ini
 *.tsbuildinfo
 .cache/
 cache/
+
+# Additional caches & tool artifacts
+.eslintcache
+.vite/
+.turbo/
+.parcel-cache/
+
+# More certificate/key formats
+*.pfx
+*.p12
+*.der
+
+# Local package manager configs (may include tokens)
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# Backups / temp files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+~*

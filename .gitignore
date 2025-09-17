@@ -51,3 +51,33 @@ tsbuildinfo.json
 ehthumbs.db
 Icon?
 Desktop.ini
+
+# Additional caches & tool artifacts
+.eslintcache
+.vite/
+.turbo/
+.parcel-cache/
+
+# More certificate/key formats
+*.pfx
+*.p12
+*.der
+
+# Database dumps / local DB files
+*.sql
+*.sqlite
+*.db
+dump/
+
+# Local package manager configs (may include tokens)
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# Backups / temp files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+~*
