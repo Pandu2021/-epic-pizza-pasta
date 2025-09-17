@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { prisma } from '../prisma';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
+import { AdminOrderStatusDto } from './dto/order.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
@@ -18,7 +19,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/status')
-  async setStatus(@Param('id') id: string, @Body() body: { status: string }) {
+  async setStatus(@Param('id') id: string, @Body() body: AdminOrderStatusDto) {
     const updated = await prisma.order.update({ where: { id }, data: { status: body.status } });
     return updated;
   }

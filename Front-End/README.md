@@ -1,22 +1,29 @@
-# Epic Pizza & Pasta — Frontend (React + Vite + TS)
+# Epic Pizza & Pasta — Front-End (React + Vite + TS)
 
 ## Quick start
 
-- Install dependencies
-- Run dev server
-- Build and preview
+1) Create `.env` (see below)
+2) Install deps: `npm ci`
+3) Start dev: `npm run dev` → http://localhost:5173
+4) Build: `npm run build`; Preview: `npm run preview`
 
 ## Scripts
 - dev: start Vite dev server
 - build: typecheck then build
 - preview: preview built assets
-- test: run unit tests (Vitest)
-- lint: run ESLint
+- test / test:ui: Vitest
+- lint, format, typecheck
 
 ## Env vars
-Create `.env` with:
-- VITE_API_BASE_URL=http://localhost:3000/api
+Create `.env` with at minimum:
+- VITE_API_BASE_URL=http://localhost:4000/api
 - VITE_APP_NAME=Epic Pizza & Pasta
+
+## API client & CSRF
+- Axios instance in `src/services/api.ts` uses:
+  - `withCredentials: true` for cookie-based auth
+  - CSRF: `xsrfCookieName: 'XSRF-TOKEN'` and header `X-CSRF-Token`
+- On app start, it best-effort calls `GET /auth/csrf` to set the token cookie and auto-retries once on CSRF failure.
 
 ## Tech
 - React 18 + Vite + TypeScript
@@ -34,8 +41,13 @@ Create `.env` with:
 - src/utils: helpers
 - src/styles: global css
 
----
-This scaffold aligns with the project summary and can be wired to backend endpoints when ready.
+## Security headers and SPA routing
+- `public/.htaccess` configures SPA fallback, HTTPS redirect, and security headers:
+  - CSP (adjust `connect-src` to include your API origin)
+  - HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy no-referrer
 
-Deployment
-- For Render.com deployment (Static Site with SPA routing), see the root `DEPLOYMENT.md` and `render.yaml`.
+---
+Docs: See `DOCUMENTATION.md` (this folder) and the root `DOCUMENTATION.md`.
+
+Changelog
+- 2025-09: CSRF handshake documented, default API base set to port 4000, `.htaccess` security notes.

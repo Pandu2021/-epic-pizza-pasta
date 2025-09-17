@@ -1,91 +1,101 @@
 # Epic Pizza & Pasta — Back-End
 
-This backend is a secure NestJS + Prisma + PostgreSQL service with PromptPay support.
+Secure NestJS + Prisma + PostgreSQL service with PromptPay support.
 
-## What’s included (Done)
-- NestJS bootstrap with security middleware (helmet, CORS, validation, cookies, rate limit, CSRF)
-- Prisma schema (PostgreSQL) and generated client
-- Core entities: User, MenuItem, Order, OrderItem, Payment, WebhookEvent
-- API routes:
-  - GET `/api/health`
-  - POST `/api/orders` (creates order + pending payment; returns PromptPay QR payload when paymentMethod=promptpay)
-  - GET `/api/orders/:id`
-  - POST `/api/payments/promptpay/create` (returns QR payload)
-  - POST `/api/webhooks/promptpay` (HMAC signature check + updates payment/order)
-- Utils: PromptPay QR payload builder (dev mock), webhook signature verify
-- Dockerfile + docker-compose (Postgres + Redis)
-- CI workflow (install → prisma generate → build → lint → test)
-- .env.example with all required variables
+## Features (Done)
+- Security middleware: helmet, CORS allowlist, validation, cookies, rate limit (global + auth), CSRF (double-submit)
+- JWT auth (RS256) with HttpOnly cookies; role guard for admin
+- Prisma schema & client; models: User, MenuItem, Order, OrderItem, Payment, WebhookEvent
+- Admin endpoints (Users/Menu/Orders) with DTO validation
+- Payments: PromptPay QR & webhook (HMAC signature verification)
+- Logging: pino-http (request id) + morgan
+- CI workflow: install → prisma generate → build → lint → test
+- Dockerfile + docker-compose
+- `.env.example`
 
-## Not yet (Next up)
+## What's new
+- Login lockout: 5 failed attempts per email+IP within 15 minutes returns 429
+- Structured logging via pino-http with per-request IDs (X-Request-Id)
+- HSTS auto-enabled in production; CSP toggle via env (`HELMET_CSP`)
+- Strong DTO validation on admin controllers (users/menu/orders)
+- Auth endpoints have tighter rate limits; body size limit is configurable (`BODY_LIMIT`)
+- Trust proxy enabled for correct HTTPS/IP when behind reverse proxies
+- Hardened .gitignore and added complete documentation files
+
+## Roadmap (Next)
+- Refresh token rotation + revocation store
+- Wider audit logging persisted to DB
 - OpenAPI/Swagger docs
-- Admin endpoints (CRUD for menu/users/orders)
-- Background jobs (BullMQ) for email/print/sheets
-- Rate limiting and mTLS/WAF hardening
-- Tests (unit/integration) coverage
+- Security gates in CI (npm audit/Snyk), broader tests
 
 ## Stack
-- Node.js 20, NestJS 10, TypeScript 5
-- Prisma ORM, PostgreSQL 16, Redis 7
-- Security: helmet, CORS allowlist, global validation, rate limiting, CSRF (double-submit), JWT auth (RS256), role guard, HMAC webhook verification
+- Node.js 18+, NestJS 10, TypeScript 5
+- Prisma ORM, PostgreSQL 16
+- Security: helmet/HSTS, CORS allowlist, ValidationPipe, express-rate-limit, CSRF, JWT (RS256), role guard, HMAC webhook verify
 - CI: GitHub Actions
-- Container: Docker
+
+## Scripts
+- build: compile TypeScript to `dist`
+- build:prod: prisma generate + compile
+- start: run built server
+- start:dev: run with tsx watcher
+- prisma:generate / prisma:migrate / prisma:deploy
+- seed:menu: seed menu items
+- test / test:watch, lint, format
 
 ## Quick start (Windows PowerShell)
-1. Copy `.env.example` to `.env` and adjust values.
-2. Start infra:
-   - `docker compose up -d`  (from this folder)
+1) Copy `.env.example` → `.env` and fill variables.
+2) Install & generate:
+   - npm ci
+   - npm run prisma:migrate
+3) Dev:
+   - npm run start:dev
+4) Build:
+   - npm run build
 
-## Security hardening
+API at http://localhost:4000
 
-The API is configured with the following protections:
+## Security
+- Helmet headers; enable CSP via `HELMET_CSP=true`. HSTS auto-enabled in production.
+- CORS allowlist via `CORS_ORIGINS` (comma-separated). Cookies: SameSite=Lax, Secure in prod.
+- CSRF flow:
+  1) Client calls `GET /api/auth/csrf` (best-effort on app start)
+  2) Server sets `XSRF-TOKEN` (readable) and a secret cookie (httpOnly)
+  3) For non-GET requests, client sends `X-CSRF-Token` header with the token value
+- Lockout: 5 failed logins/15 mins per email+IP (429 thereafter).
+- Tokens: Access/refresh with RS256. Configure TTLs and cookie secret.
 
-- HTTP headers via Helmet (X-Frame-Options DENY, no-referrer, etc.). Enable CSP by setting `HELMET_CSP=true` after validating allowed asset and API origins.
-- Strict CORS allowlist via `CORS_ORIGINS` (comma-separated). Cookies are `SameSite=Lax` and `Secure` in production.
-- CSRF protection using double-submit cookie. Obtain a token from `GET /api/auth/csrf`; send it in `X-CSRF-Token` for non-GET requests. Webhooks are exempt (`/api/webhooks/promptpay`).
-- Rate limiting: global 300 req / 15 min per IP (adjust in `src/main.ts`).
-- HPP prevention and JSON/urlencoded body size limits (default `BODY_LIMIT=200kb`).
-- JWT (RS256) for auth, tokens stored in httpOnly cookies. Configure `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`.
-
-Environment variables added:
+Required env (subset):
 
 ```
+PORT=4000
+DATABASE_URL=postgresql://user:pass@localhost:5432/db
+JWT_PRIVATE_KEY=... (escaped PEM) 
+JWT_PUBLIC_KEY=... (escaped PEM)
+JWT_ACCESS_TTL=900s
+JWT_REFRESH_TTL=7d
+COOKIE_SECRET=...
+CORS_ORIGINS=http://localhost:5173
+PROMPTPAY_MERCHANT_ID=...
+PROMPTPAY_WEBHOOK_SECRET=...
 HELMET_CSP=false
 BODY_LIMIT=200kb
 ```
 
-If running behind a reverse proxy, the app trusts proxy headers (`app.set('trust proxy', 1)`), required for correct `secure` cookie behavior.
-3. Install deps & generate Prisma client:
-   - `npm ci`
-   - `npm run prisma:migrate`
-4. Run dev:
-   - `npm run start:dev`
+## API highlights
+- GET `/api/health`
+- POST `/api/auth/login`, GET `/api/auth/me`, POST `/api/auth/refresh`, POST `/api/auth/logout`
+- POST `/api/orders`, GET `/api/orders/:id`
+- POST `/api/payments/promptpay/create`, GET `/api/payments/:orderId/status`
+- POST `/api/webhooks/promptpay`
 
-API will be at http://localhost:4000
-
-PostgreSQL (Docker Compose)
-- Configured via `.env` (see `.env.example`: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
-- Ports are bound to localhost only: 127.0.0.1:5432
-- Prisma uses `DATABASE_URL` which should match the above values
-
-### Seed menu data (optional)
-To load initial menu items into PostgreSQL:
-1. Edit `prisma/seed/menu.json` as needed (copy from Front-End `src/data/menu.ts` logically).
-2. Run the seed:
-   - `npm run seed:menu`
-This upserts items by `id` when provided.
-
-### Security notes
-- Set JWT keys and secrets in `.env` (see `.env.example`):
-   - JWT_PRIVATE_KEY, JWT_PUBLIC_KEY, JWT_ACCESS_TTL, JWT_REFRESH_TTL
-   - COOKIE_SECRET, CSRF_SECRET
-   - CORS_ORIGINS
-- CSRF flow: client hits `GET /api/auth/csrf` to obtain `XSRF-TOKEN` cookie, then sends token in `X-CSRF-Token` header for non-GET requests.
-- Auth: `POST /api/auth/login` sets HttpOnly cookies `access_token` and `refresh_token`. Use `GET /api/auth/me` to fetch the current user. `POST /api/auth/refresh` rotates access token.
-
-## API Contract (short)
 See `API-CONTRACT.md` for details.
 
+## Deployment
+Behind reverse proxy with HTTPS (HSTS). Configure env & CORS origins. See root `DEPLOYMENT.md` and `render.yaml`.
+
 ---
-Deployment
-- For step-by-step Render.com deployment (backend Web Service + frontend Static Site), see the root `DEPLOYMENT.md` and `render.yaml`.
+See also: `DOCUMENTATION.md` (this folder) and the root `DOCUMENTATION.md`.
+
+Changelog
+- 2025-09: Lockout, pino-http request IDs, HSTS in prod, admin DTO validation, CSRF flow docs.

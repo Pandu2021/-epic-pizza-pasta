@@ -5,11 +5,17 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import pinoHttp from 'pino-http';
 import rateLimit from 'express-rate-limit';
 import csrf from 'csurf';
 import { ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import * as express from 'express';
+import crypto from 'crypto';
+
+function cryptoRandomId() {
+  return crypto.randomBytes(12).toString('hex');
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -31,6 +37,16 @@ async function bootstrap() {
   app.use(express.json({ limit: process.env.BODY_LIMIT || '200kb' }));
   app.use(express.urlencoded({ extended: false, limit: process.env.BODY_LIMIT || '200kb' }));
   app.use(cookieParser(process.env.COOKIE_SECRET));
+  // Attach a request id and structured logger
+  app.use((req: any, _res: Response, next: NextFunction) => {
+    req.id = req.id || cryptoRandomId();
+    next();
+  });
+  app.use(pinoHttp({
+    genReqId: (req: any) => req.id || cryptoRandomId(),
+    autoLogging: true,
+    customProps: (req: any) => ({ reqId: req.id }),
+  }));
   app.use(morgan('combined'));
 
   // Basic rate limit (adjust per route as needed)
@@ -62,6 +78,11 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+
+  // Enable HSTS in production (assumes HTTPS behind proxy)
+  if (process.env.NODE_ENV === 'production') {
+    app.use(helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }));
+  }
 
   // CSRF Protection using double-submit cookie pattern
   // Use a separate secret cookie for CSRF (do NOT name it the same as the token cookie)

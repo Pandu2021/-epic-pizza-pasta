@@ -2,17 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@n
 import { prisma } from '../prisma';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
+import { AdminMenuCreateDto, AdminMenuUpdateDto } from './dto/menu.dto';
 
-type MenuCreateDto = {
-  category: string;
-  name: Record<string, string> | string;
-  description?: Record<string, string> | string;
-  images?: string[];
-  basePrice: number;
-  priceL?: number;
-  priceXL?: number;
-  options?: unknown;
-};
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
@@ -24,7 +15,7 @@ export class AdminMenuController {
   }
 
   @Post()
-  async create(@Body() body: MenuCreateDto) {
+  async create(@Body() body: AdminMenuCreateDto) {
     const toJson = (v: unknown) => (typeof v === 'string' ? { en: v } : v ?? null);
     const created = await prisma.menuItem.create({
       data: {
@@ -47,7 +38,7 @@ export class AdminMenuController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: Partial<MenuCreateDto>) {
+  async update(@Param('id') id: string, @Body() body: AdminMenuUpdateDto) {
     const toJson = (v: unknown) => (typeof v === 'string' ? { en: v } : v ?? null);
     const updated = await prisma.menuItem.update({
       where: { id },

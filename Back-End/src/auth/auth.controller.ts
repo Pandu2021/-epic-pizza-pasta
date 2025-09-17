@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards, ConflictException, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards, ConflictException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { prisma } from '../prisma';
 import * as argon2 from 'argon2';
 import { Response, Request } from 'express';
@@ -26,12 +26,40 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() body: { email: string; password: string }, @Res({ passthrough: true }) res: Response) {
-  const email = (body.email || '').trim().toLowerCase();
-  const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return { ok: false };
-    const ok = await argon2.verify(user.passwordHash, body.password);
-    if (!ok) return { ok: false };
+    async login(@Body() body: { email: string; password: string }, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const email = (body.email || '').trim().toLowerCase();
+
+      // Simple lockout: 5 failed attempts per 15 minutes per email+IP
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+      const key = `${email}|${ip}`;
+      const now = Date.now();
+      const windowMs = 15 * 60 * 1000;
+      const maxAttempts = 5;
+      (global as any).__loginFail ||= new Map<string, { count: number; first: number }>();
+      const store: Map<string, { count: number; first: number }> = (global as any).__loginFail;
+      const rec = store.get(key);
+      if (rec && now - rec.first < windowMs && rec.count >= maxAttempts) {
+        (req as any)?.log?.warn({ email, ip, count: rec.count }, 'login lockout');
+        throw new HttpException('Too many login attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+      }
+
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        const r = rec && now - rec.first < windowMs ? { count: rec.count + 1, first: rec.first } : { count: 1, first: now };
+        store.set(key, r);
+        (req as any)?.log?.warn({ email, ip, count: r.count }, 'login failed: user not found');
+        return { ok: false };
+      }
+      const ok = await argon2.verify(user.passwordHash, body.password);
+      if (!ok) {
+        const r = rec && now - rec.first < windowMs ? { count: rec.count + 1, first: rec.first } : { count: 1, first: now };
+        store.set(key, r);
+        (req as any)?.log?.warn({ userId: user.id, email, ip, count: r.count }, 'login failed: bad password');
+        return { ok: false };
+      }
+      // success: reset counter
+      store.delete(key);
+      (req as any)?.log?.info({ userId: user.id, email, ip }, 'login success');
     const payload = { id: user.id, email: user.email, role: user.role };
     const access = auth.signAccess(payload);
     const refresh = auth.signRefresh(payload);
