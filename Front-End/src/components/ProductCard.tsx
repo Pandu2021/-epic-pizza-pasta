@@ -79,7 +79,7 @@ export default function ProductCard({ name, price, priceL, priceXL, imageUrl, la
           <div className="text-sm text-slate-500">{t('from')}</div>
           <div className="mt-0.5 text-lg font-semibold">
             {priceL != null && priceXL != null ? (
-              <span>฿ {priceL.toFixed(0)} / {priceXL.toFixed(0)}</span>
+              <span>฿ {priceL.toFixed(0)} / ฿ {priceXL.toFixed(0)}</span>
             ) : (
               <span>฿ {price.toFixed(0)}</span>
             )}

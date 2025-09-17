@@ -35,6 +35,26 @@ This backend is a secure NestJS + Prisma + PostgreSQL service with PromptPay sup
 1. Copy `.env.example` to `.env` and adjust values.
 2. Start infra:
    - `docker compose up -d`  (from this folder)
+
+## Security hardening
+
+The API is configured with the following protections:
+
+- HTTP headers via Helmet (X-Frame-Options DENY, no-referrer, etc.). Enable CSP by setting `HELMET_CSP=true` after validating allowed asset and API origins.
+- Strict CORS allowlist via `CORS_ORIGINS` (comma-separated). Cookies are `SameSite=Lax` and `Secure` in production.
+- CSRF protection using double-submit cookie. Obtain a token from `GET /api/auth/csrf`; send it in `X-CSRF-Token` for non-GET requests. Webhooks are exempt (`/api/webhooks/promptpay`).
+- Rate limiting: global 300 req / 15 min per IP (adjust in `src/main.ts`).
+- HPP prevention and JSON/urlencoded body size limits (default `BODY_LIMIT=200kb`).
+- JWT (RS256) for auth, tokens stored in httpOnly cookies. Configure `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`.
+
+Environment variables added:
+
+```
+HELMET_CSP=false
+BODY_LIMIT=200kb
+```
+
+If running behind a reverse proxy, the app trusts proxy headers (`app.set('trust proxy', 1)`), required for correct `secure` cookie behavior.
 3. Install deps & generate Prisma client:
    - `npm ci`
    - `npm run prisma:migrate`
@@ -68,4 +88,4 @@ See `API-CONTRACT.md` for details.
 
 ---
 Deployment
-- For step-by-step cPanel deployment instructions, see the root `DEPLOYMENT.md`.
+- For step-by-step Render.com deployment (backend Web Service + frontend Static Site), see the root `DEPLOYMENT.md` and `render.yaml`.

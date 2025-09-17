@@ -19,7 +19,7 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
     "postinstall": "npm run build:prod",
-  "seed:menu": "tsx prisma/seed/menu.seed.ts",
+    "seed:menu": "tsx prisma/seed/menu.seed.ts",
     "prepare": "husky install"
   },
   "engines": {
@@ -38,6 +38,7 @@
     "csurf": "^1.11.0",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pino": "^9.3.2",
@@ -48,9 +49,10 @@
     "@types/cookie-parser": "^1.4.7",
     "@types/csurf": "^1.11.5",
     "@types/express": "^4.17.21",
+    "@types/hpp": "^0.2.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.6",
-    "@types/node": "^20.16.11",
+    "@types/node": "^20.19.15",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.1",

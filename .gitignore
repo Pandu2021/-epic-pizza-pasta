@@ -69,6 +69,9 @@ Desktop.ini
 *.db
 dump/
 
+# Do not ignore Prisma migration files
+!Back-End/prisma/migrations/**
+
 # Local package manager configs (may include tokens)
 .npmrc
 .yarnrc

@@ -22,12 +22,12 @@ export class PaymentsController {
     return { qrPayload };
   }
 
-  @Post('webhooks/promptpay')
   @Get('payments/:orderId/status')
   async status(@Param('orderId') orderId: string) {
     const pay = await prisma.payment.findUnique({ where: { orderId } });
     return { orderId, status: pay?.status ?? 'unknown', paidAt: pay?.paidAt ?? null };
   }
+  @Post('webhooks/promptpay')
   async promptpayWebhook(
     @Headers('x-signature') signature: string,
     @Body() payload: { orderId: string; status: 'PAID' | 'FAILED'; providerRefId?: string }

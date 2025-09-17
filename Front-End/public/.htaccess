@@ -28,3 +28,23 @@ RewriteRule ^ index.html [L]
 	ExpiresByType image/jpeg "access plus 1 month"
 	ExpiresByType image/gif "access plus 1 month"
 </IfModule>
+
+###############################
+# Security headers
+###############################
+<IfModule mod_headers.c>
+	# Content Security Policy: adjust API origin and asset domains as needed
+	# Default allows self resources, inline styles are blocked, images from self and data URIs
+	Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.example.com http://localhost:4000; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+	# Mitigate clickjacking
+	Header always set X-Frame-Options "DENY"
+	# MIME type sniffing protection
+	Header set X-Content-Type-Options "nosniff"
+	# Referrer policy
+	Header set Referrer-Policy "no-referrer"
+	# Opt-in to additional isolation protections (no powerful features)
+	Header set Permissions-Policy "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()"
+	# HSTS (enable only when HTTPS is fully configured)
+	Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+</IfModule>

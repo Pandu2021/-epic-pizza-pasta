@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards, ConflictException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards, ConflictException, BadRequestException } from '@nestjs/common';
 import { prisma } from '../prisma';
 import * as argon2 from 'argon2';
 import { Response, Request } from 'express';
@@ -10,6 +10,9 @@ export class AuthController {
   @Post('register')
   async register(@Body() body: { email: string; password: string; name?: string; phone?: string }) {
     const email = (body.email || '').trim().toLowerCase();
+    if ((body.password || '').length < 8 || !/[A-Za-z]/.test(body.password) || !/\d/.test(body.password)) {
+      throw new BadRequestException('Password must be at least 8 characters and include letters and numbers');
+    }
     const passwordHash = await argon2.hash(body.password);
     try {
       const user = await prisma.user.create({ data: { email, passwordHash, name: body.name, phone: body.phone } });

@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: epic-pizza-backend
+    env: node
+    plan: free
+    rootDir: Back-End
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set DATABASE_URL, COOKIE_SECRET, JWT keys, etc. in Render dashboard or here as sync vars
+      # - key: DATABASE_URL
+      #   sync: false
+      # - key: COOKIE_SECRET
+      #   generateValue: true
+      # - key: CORS_ORIGINS
+      #   value: https://epic-pizza-frontend.onrender.com
+    postDeployCommand: npm run prisma:deploy
+
+  - type: static
+    name: epic-pizza-frontend
+    rootDir: Front-End
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
