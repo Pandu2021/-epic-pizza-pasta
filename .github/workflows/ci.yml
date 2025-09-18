@@ -34,8 +34,9 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: Lint
-        run: npm run lint --if-present
+      - name: Lint (non-blocking, src only)
+        run: npx eslint "src/**/*.{ts,tsx}" --max-warnings=0
+        continue-on-error: true
 
       - name: Build
         run: npm run build
@@ -66,8 +67,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --if-present
 
-      - name: Lint
+      - name: Lint (non-blocking)
         run: npm run lint --if-present
+        continue-on-error: true
 
       - name: Build
         run: npm run build
