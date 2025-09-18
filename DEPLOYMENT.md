@@ -26,20 +26,40 @@ Front-End (Static Site):
 1. Backend: `npm ci` lalu `npm run build` di folder `Back-End`
 2. Frontend: `npm ci` lalu `npm run build` di folder `Front-End`
 
-### Langkah 2 — Deploy dengan render.yaml
+### Opsi A — Deploy dengan render.yaml (Blueprint)
 1. Push repo ke Git provider (GitHub/GitLab) yang terhubung dengan Render.
 2. Di Render, pilih New → Blueprint → Hubungkan repo yang berisi `render.yaml`.
 3. Render akan membuat:
    - Web Service: epic-pizza-backend
-     - Build: `npm ci && npm run build`
+     - Build: `NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run build`
      - Start: `npm run start:prod`
      - Health Check: `/api/health`
      - Post Deploy: `npm run prisma:deploy` (menjalankan migrasi)
    - Static Site: epic-pizza-frontend
-     - Build: `npm ci && npm run build`
+     - Build: `NPM_CONFIG_PRODUCTION=false npm ci && npm run build`
      - Publish dir: `dist`
      - Rewrites: `/* -> /index.html`
 4. Set semua Environment Variables pada kedua service sesuai kebutuhan.
+
+Catatan:
+- `NPM_CONFIG_PRODUCTION=false` memastikan devDependencies (TypeScript, @types) ikut ter-install saat build.
+- `HUSKY=0` menonaktifkan git hooks saat build di server.
+
+### Opsi B — Deploy TANPA Blueprint (dua service terpisah)
+Jika tidak ingin menggunakan Blueprint, Anda bisa membuat dua service secara manual di Render:
+- Back-End (Web Service):
+  - Root Directory: `Back-End`
+  - Build Command: `NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run build`
+  - Start Command: `npm run start:prod`
+  - Health Check Path: `/api/health`
+  - Post-deploy Command: `npm run prisma:deploy`
+- Front-End (Static Site):
+  - Root Directory: `Front-End`
+  - Build Command: `NPM_CONFIG_PRODUCTION=false npm ci && npm run build`
+  - Publish Directory: `dist`
+  - Redirects/Rewrites: `/* -> /index.html`
+
+Untuk auto-deploy dari GitHub Actions, aktifkan Deploy Hooks di masing-masing service dan isi secrets `RENDER_BACKEND_HOOK_URL` dan `RENDER_FRONTEND_HOOK_URL` seperti dijelaskan di bawah.
 
 ### Routing & CORS
 - Set `VITE_API_BASE_URL` pada Front-End menunjuk ke domain backend Render (misal `https://epic-pizza-backend.onrender.com/api`).
@@ -78,4 +98,5 @@ Setup yang diperlukan:
 Catatan:
 - Jika salah satu secret tidak di-set, langkah deploy untuk service tersebut akan dilewati (workflow tetap sukses).
 - Anda tetap dapat menggunakan Render Blueprint (`render.yaml`) untuk membuat service; hooks hanya memicu redeploy dari branch yang sama.
+ - Hapus workflow duplikat di `Back-End/.github/workflows/ci.yml` atau jadikan reusable (sudah diubah menjadi reusable) agar tidak terjadi double-run.
 
