@@ -1,7 +1,7 @@
 services:
   - type: web
     name: epic-pizza-backend
-    env: node
+    runtime: node
     plan: free
     rootDir: Back-End
     buildCommand: npm ci && npm run build
@@ -18,13 +18,14 @@ services:
       #   generateValue: true
       # - key: CORS_ORIGINS
       #   value: https://epic-pizza-frontend.onrender.com
-    postDeployCommand: npm run prisma:deploy
+    preDeployCommand: npm run prisma:deploy
 
-  - type: static_site
+  - type: web
     name: epic-pizza-frontend
+    runtime: static
     rootDir: Front-End
     buildCommand: npm ci && npm run build
-    publishPath: dist
+    staticPublishPath: dist
     routes:
       - type: rewrite
         source: /*
