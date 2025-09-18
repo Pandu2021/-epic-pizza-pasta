@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: Back-End
     buildCommand: NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run build
-    startCommand: npm run start:prod
+    startCommand: npm run start:render
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
@@ -18,7 +18,7 @@ services:
       #   generateValue: true
       # - key: CORS_ORIGINS
       #   value: https://epic-pizza-frontend.onrender.com
-    preDeployCommand: npm run prisma:deploy
+  # Note: preDeployCommand is not supported on free plan; Prisma migrations will run at start.
 
   - type: web
     name: epic-pizza-frontend

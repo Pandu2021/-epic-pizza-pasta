@@ -32,9 +32,9 @@ Front-End (Static Site):
 3. Render akan membuat:
    - Web Service: epic-pizza-backend
      - Build: `NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run build`
-     - Start: `npm run start:prod`
+     - Start: `npm run start:render`
      - Health Check: `/api/health`
-     - Post Deploy: `npm run prisma:deploy` (menjalankan migrasi)
+     - Catatan: Pada plan Free, `preDeployCommand` tidak didukung. Migrasi Prisma dijalankan saat start via `start:render`.
    - Static Site: epic-pizza-frontend
      - Build: `NPM_CONFIG_PRODUCTION=false npm ci && npm run build`
      - Publish dir: `dist`
@@ -44,6 +44,10 @@ Front-End (Static Site):
 Catatan:
 - `NPM_CONFIG_PRODUCTION=false` memastikan devDependencies (TypeScript, @types) ikut ter-install saat build.
 - `HUSKY=0` menonaktifkan git hooks saat build di server.
+- Pada plan Free Render, `preDeployCommand` tidak tersedia. Alternatif:
+  - (Sudah diterapkan) Jalankan `prisma migrate deploy` pada start command (`start:render`). Ini idempotent dan cepat.
+  - Jalankan migrasi manual sekali via Shell Render: `npm run prisma:deploy`.
+  - Upgrade plan untuk mendukung `preDeployCommand` jika ingin memisahkan migrasi.
 
 ### Opsi B — Deploy TANPA Blueprint (dua service terpisah)
 Jika tidak ingin menggunakan Blueprint, Anda bisa membuat dua service secara manual di Render:

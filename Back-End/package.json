@@ -9,6 +9,7 @@
     "start": "node dist/main.js",
     "prestart:prod": "npm run prisma:generate",
     "start:prod": "node dist/main.js",
+  "start:render": "npm run prisma:deploy && node dist/main.js",
     "start:dev": "tsx watch src/main.ts",
     "start:debug": "node --inspect dist/main.js",
     "lint": "eslint .",
