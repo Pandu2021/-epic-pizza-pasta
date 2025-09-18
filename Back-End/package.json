@@ -19,7 +19,7 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
     "seed:menu": "tsx prisma/seed/menu.seed.ts",
-  "prepare": "husky install || true"
+    "prepare": "husky install || true"
   },
   "engines": {
     "node": ">=18"
