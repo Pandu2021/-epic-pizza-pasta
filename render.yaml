@@ -9,24 +9,29 @@ services:
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
+    - key: NODE_ENV
+      value: production
       # Set DATABASE_URL, COOKIE_SECRET, JWT keys, etc. in Render dashboard or here as sync vars
-      # - key: DATABASE_URL
-      #   sync: false
-      # - key: COOKIE_SECRET
-      #   generateValue: true
-      # - key: CORS_ORIGINS
-      #   value: https://epic-pizza-frontend.onrender.com
+    - key: DATABASE_URL
+      sync: false
+    - key: COOKIE_SECRET
+      generateValue: true
+    - key: CORS_ORIGINS
+      value: https://epic-pizza-frontend.onrender.com
   # Note: preDeployCommand is not supported on free plan; Prisma migrations will run at start.
 
   - type: web
     name: epic-pizza-frontend
     runtime: static
-    plan: free
     rootDir: Front-End
     buildCommand: NPM_CONFIG_PRODUCTION=false npm ci && npm run build
     autoDeploy: true
+    envVars:
+      # Set frontend envs in Render dashboard or here as sync vars
+    - key: VITE_API_BASE_URL
+      sync: false
+    - key: VITE_APP_NAME
+      value: Epic Pizza & Pasta
     staticPublishPath: dist
     routes:
       - type: rewrite
