@@ -59,3 +59,23 @@ Front-End (Static Site):
 ### Update aplikasi
 - Render auto-deploy setiap push (autoDeploy: true). Anda bisa mematikan jika ingin manual.
 
+## CI/CD GitHub Actions → Render
+
+Repo ini memiliki workflow CI di `.github/workflows/ci.yml`:
+- Backend job: install, prisma generate, lint, build, test
+- Frontend job: install, typecheck, lint, build, test
+- Deploy job: berjalan pada push ke branch `main` setelah kedua job di atas sukses. Deploy job akan memicu Render Deploy Hooks.
+
+Setup yang diperlukan:
+1. Di Render, buka masing-masing service (backend/frontend) → Settings → Deploy Hooks → salin URL deploy hook.
+2. Di GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+  - `RENDER_BACKEND_HOOK_URL` = URL deploy hook backend
+  - `RENDER_FRONTEND_HOOK_URL` = URL deploy hook frontend
+3. Setiap push ke `main` akan:
+  - Menjalankan CI (build/lint/test FE & BE)
+  - Jika sukses, memanggil kedua deploy hooks sehingga Render melakukan deploy.
+
+Catatan:
+- Jika salah satu secret tidak di-set, langkah deploy untuk service tersebut akan dilewati (workflow tetap sukses).
+- Anda tetap dapat menggunakan Render Blueprint (`render.yaml`) untuk membuat service; hooks hanya memicu redeploy dari branch yang sama.
+

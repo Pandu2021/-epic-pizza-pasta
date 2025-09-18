@@ -20,11 +20,11 @@ services:
       #   value: https://epic-pizza-frontend.onrender.com
     postDeployCommand: npm run prisma:deploy
 
-  - type: static
+  - type: static_site
     name: epic-pizza-frontend
     rootDir: Front-End
     buildCommand: npm ci && npm run build
-    staticPublishPath: dist
+    publishPath: dist
     routes:
       - type: rewrite
         source: /*
