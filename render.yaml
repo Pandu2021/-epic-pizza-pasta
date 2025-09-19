@@ -11,13 +11,15 @@ services:
     runtime: node
     plan: free
     rootDir: Back-End
-    buildCommand: NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run build
+    buildCommand: NPM_CONFIG_PRODUCTION=false HUSKY=0 npm ci && npm run prisma:generate && npm run build
     startCommand: npm run start:render
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: SEED_ON_START
+        value: "true"
       - key: DATABASE_URL
         fromDatabase:
           name: epic-pizza-db
