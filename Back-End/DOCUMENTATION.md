@@ -1,6 +1,6 @@
 # Epic Pizza & Pasta — Back-End Documentation
 
-Date: 2025-09-17
+Last updated: 2025-09-19
 
 ## Overview
 NestJS + Prisma + PostgreSQL API with JWT auth, CSRF protection, rate limiting, DTO validation, and PromptPay integration.
@@ -57,3 +57,5 @@ NestJS + Prisma + PostgreSQL API with JWT auth, CSRF protection, rate limiting, 
 - Persisted audit logs for admin operations
 - Swagger/OpenAPI docs
 - Security checks in CI (npm audit/Snyk); add e2e tests
+
+See also: README.md, SETUP.md, ARCHITECTURE.md, TESTING.md, API-CONTRACT.md

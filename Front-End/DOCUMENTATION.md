@@ -1,6 +1,6 @@
 # Epic Pizza & Pasta — Front-End Documentation
 
-Date: 2025-09-17
+Last updated: 2025-09-19
 
 ## Overview
 React + Vite + TypeScript SPA for menu browsing, cart/checkout, profile & order history, with i18n and secure API integration.
@@ -57,3 +57,5 @@ Add others as needed (e.g., app name, feature flags) with `VITE_` prefix.
 - Reduce `'unsafe-inline'` in CSP for styles using nonce/hash when feasible
 - Add e2e tests for auth/CSRF flows
 - Document any additional env flags used by new features
+
+See also: README.md, SETUP.md, ARCHITECTURE.md, TESTING.md

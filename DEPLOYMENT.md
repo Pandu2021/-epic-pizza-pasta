@@ -1,5 +1,7 @@
 ## Deployment guide: Render.com (Node.js backend + SPA frontend)
 
+Last updated: 2025-09-19
+
 Dokumen ini menjelaskan cara deploy Epic Pizza & Pasta ke Render.com:
 - Backend: NestJS Web Service (Node.js)
 - Frontend: React + Vite Static Site
@@ -103,4 +105,8 @@ Catatan:
 - Jika salah satu secret tidak di-set, langkah deploy untuk service tersebut akan dilewati (workflow tetap sukses).
 - Anda tetap dapat menggunakan Render Blueprint (`render.yaml`) untuk membuat service; hooks hanya memicu redeploy dari branch yang sama.
  - Hapus workflow duplikat di `Back-End/.github/workflows/ci.yml` atau jadikan reusable (sudah diubah menjadi reusable) agar tidak terjadi double-run.
+
+Referensi lain:
+- Back-End/README.md untuk variabel lingkungan dan script.
+- Front-End/README.md untuk pengaturan Vite dan `.htaccess`.
 

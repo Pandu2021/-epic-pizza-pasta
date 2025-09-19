@@ -1,6 +1,6 @@
 # Epic Pizza & Pasta — Project Documentation
 
-Date: 2025-09-17
+Last updated: 2025-09-19
 
 ## 1) Overview
 
@@ -147,4 +147,6 @@ See details in the Security section below.
 
 ---
 
-For questions or contributions, see repository README files per package.
+For questions or contributions, see repository README files per package:
+- Back-End/README.md
+- Front-End/README.md

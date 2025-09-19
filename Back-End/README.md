@@ -2,6 +2,19 @@
 
 Secure NestJS + Prisma + PostgreSQL service with PromptPay support.
 
+Last updated: 2025-09-19
+
+## Table of Contents
+
+- Quick start
+- Scripts
+- Security
+- Environment variables
+- Architecture
+- Testing
+- API highlights
+- Deployment
+
 ## Features (Done)
 - Security middleware: helmet, CORS allowlist, validation, cookies, rate limit (global + auth), CSRF (double-submit)
 - JWT auth (RS256) with HttpOnly cookies; role guard for admin
@@ -44,16 +57,18 @@ Secure NestJS + Prisma + PostgreSQL service with PromptPay support.
 - test / test:watch, lint, format
 
 ## Quick start (Windows PowerShell)
-1) Copy `.env.example` → `.env` and fill variables.
-2) Install & generate:
-   - npm ci
-   - npm run prisma:migrate
-3) Dev:
-   - npm run start:dev
-4) Build:
-   - npm run build
+1) Copy `.env.example` → `.env` and fill variables
+2) Install deps: `npm ci`
+3) Database & Prisma
+   - Local Postgres (or use docker-compose): `docker compose up -d db`
+   - Generate client: `npm run prisma:generate`
+   - Apply migrations: `npm run prisma:migrate`
+   - Seed menu (optional): `npm run seed:menu`
+4) Run
+   - Dev: `npm run start:dev`
+   - Prod (after build): `npm run build`; `npm run start:prod`
 
-API at http://localhost:4000
+API default: http://localhost:4000
 
 ## Security
 - Helmet headers; enable CSP via `HELMET_CSP=true`. HSTS auto-enabled in production.
@@ -82,6 +97,23 @@ HELMET_CSP=false
 BODY_LIMIT=200kb
 ```
 
+## Architecture
+
+- Modules: auth, menu, orders, payments, contact, estimate, health, admin
+- Middleware: helmet, hpp, body limits, request id + pino-http, morgan, rate limit, CSRF
+- Persistence: Prisma (User, MenuItem, Order, OrderItem, Payment, WebhookEvent)
+- Config: PORT, CORS_ORIGINS, COOKIE_SECRET, BODY_LIMIT, HELMET_CSP, JWT*, DATABASE_URL
+
+Notes: HSTS auto-enabled in production; CORS allowlist enforced; CSRF double-submit pattern.
+
+## Testing
+
+- Tooling: Vitest (suggest add Supertest for HTTP)
+- Commands:
+   - npm run test
+   - npm run test:watch
+- Suggested tests: auth (lockout, refresh), orders (DTO, pricing), payments (QR/webhook HMAC), security (CSRF 403, rate limit)
+
 ## API highlights
 - GET `/api/health`
 - POST `/api/auth/login`, GET `/api/auth/me`, POST `/api/auth/refresh`, POST `/api/auth/logout`
@@ -95,7 +127,7 @@ See `API-CONTRACT.md` for details.
 Behind reverse proxy with HTTPS (HSTS). Configure env & CORS origins. See root `DEPLOYMENT.md` and `render.yaml`.
 
 ---
-See also: `DOCUMENTATION.md` (this folder) and the root `DOCUMENTATION.md`.
+Documentation consolidation: Former files (SETUP/ARCHITECTURE/TESTING/DOCUMENTATION/SUMMARY/CHECKLIST) have been merged into this README. For API details, see `API-CONTRACT.md`. For deployment, see root `DEPLOYMENT.md`.
 
 Changelog
 - 2025-09: Lockout, pino-http request IDs, HSTS in prod, admin DTO validation, CSRF flow docs.

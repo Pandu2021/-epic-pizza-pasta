@@ -45,7 +45,7 @@ export default function CheckoutPage() {
       // 1) Create order in backend
       const payload = {
         customer: { name: data.name, phone: data.phone, address: data.address },
-        items: items.map((it) => ({ id: it.id, name: it.name, qty: it.qty, price: it.price })),
+        items: items.map((it) => ({ id: it.id, name: it.name, qty: it.qty, price: it.price, options: it.options ?? undefined })),
         delivery: { type: data.deliveryMethod, fee: data.deliveryMethod === 'delivery' ? 39 : 0 },
         paymentMethod: 'promptpay'
       } as const;

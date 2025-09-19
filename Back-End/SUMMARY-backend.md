@@ -1,5 +1,7 @@
 # Back-End Summary
 
+Last updated: 2025-09-19
+
 ## Current State
 NestJS + Prisma + PostgreSQL service providing menu, order, payment (PromptPay stub), and auth scaffolding.
 
@@ -45,3 +47,5 @@ Introduce a `MenuVariant` concept (JSON or separate table) to model size, extras
 
 ---
 Keep this file updated after each backend sprint.
+
+See also: README.md

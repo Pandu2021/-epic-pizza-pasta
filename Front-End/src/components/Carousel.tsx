@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 export type Slide = {
   title: string;
@@ -12,9 +12,10 @@ type Props = {
   auto?: boolean;
   intervalMs?: number;
   className?: string;
+  extra?: ReactNode; // optional overlay (e.g., Login button)
 };
 
-export default function Carousel({ slides, auto = true, intervalMs = 6000, className = '' }: Props) {
+export default function Carousel({ slides, auto = true, intervalMs = 6000, className = '', extra }: Props) {
   const [index, setIndex] = useState(0);
   const timerRef = useRef<number | null>(null);
 
@@ -43,8 +44,25 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
       role="region"
       aria-roledescription="carousel"
       aria-label="Featured highlights"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          prev();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          next();
+        }
+      }}
     >
       <div className="relative h-[380px] sm:h-[420px] md:h-[480px]">
+        {extra && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 pointer-events-none">
+            <div className="pointer-events-auto">
+              {extra}
+            </div>
+          </div>
+        )}
         {safeSlides.map((s, i) => (
           <div
             key={i}
@@ -68,12 +86,12 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
       {count > 1 && (
         <>
           {/* Controls */}
-          <button aria-label="Previous slide" className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={prev}>
+          <button type="button" aria-label="Previous slide" className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={prev}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5">
               <path fillRule="evenodd" d="M15.53 4.47a.75.75 0 010 1.06L9.06 12l6.47 6.47a.75.75 0 11-1.06 1.06l-7-7a.75.75 0 010-1.06l7-7a.75.75 0 011.06 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <button aria-label="Next slide" className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={next}>
+          <button type="button" aria-label="Next slide" className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={next}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5">
               <path fillRule="evenodd" d="M8.47 19.53a.75.75 0 010-1.06L14.94 12 8.47 5.53a.75.75 0 111.06-1.06l7 7a.75.75 0 010 1.06l-7 7a.75.75 0 01-1.06 0z" clipRule="evenodd" />
             </svg>

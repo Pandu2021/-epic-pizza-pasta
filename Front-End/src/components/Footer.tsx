@@ -66,7 +66,7 @@ export default function Footer() {
                 <a href="mailto:epicpizzaandpasta@gmail.com" className="hover:underline">epicpizzaandpasta@gmail.com</a>
               </div>
               <address className="not-italic">
-                1, 15 ซ. นนทบุรี 18/1 Bang Krasor, อำเภอเมืองนนทบุรี นนทบุรี 11000, Thailand
+                1, 15 Soi Nonthaburi, Bang Krasor, Nonthaburi 11000, Thailand
               </address>
             </div>
 

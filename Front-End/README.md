@@ -1,5 +1,18 @@
 # Epic Pizza & Pasta — Front-End (React + Vite + TS)
 
+Last updated: 2025-09-19
+
+## Table of Contents
+
+- Quick start
+- Scripts
+- Environment
+- Architecture
+- API client & CSRF
+- Structure
+- Security headers & SPA routing
+- Testing
+
 ## Quick start
 
 1) Create `.env` (see below)
@@ -14,23 +27,25 @@
 - test / test:ui: Vitest
 - lint, format, typecheck
 
-## Env vars
+## Environment
 Create `.env` with at minimum:
 - VITE_API_BASE_URL=http://localhost:4000/api
 - VITE_APP_NAME=Epic Pizza & Pasta
+
+Optional (for precise Contact page map pin):
+- VITE_MAP_LAT=13.8732674
+- VITE_MAP_LNG=100.4807412
+
+## Architecture
+- Stack: React 18, TypeScript, Vite, Tailwind
+- Routing: Home, Menu, Product, Cart, Checkout, Profile, Orders, Auth, NotFound
+- State/data: TanStack Query + Zustand; i18n: react-i18next (EN/TH)
 
 ## API client & CSRF
 - Axios instance in `src/services/api.ts` uses:
   - `withCredentials: true` for cookie-based auth
   - CSRF: `xsrfCookieName: 'XSRF-TOKEN'` and header `X-CSRF-Token`
 - On app start, it best-effort calls `GET /auth/csrf` to set the token cookie and auto-retries once on CSRF failure.
-
-## Tech
-- React 18 + Vite + TypeScript
-- Tailwind CSS
-- React Router, TanStack Query, Zustand
-- react-i18next (EN/TH)
-- Vitest + Testing Library
 
 ## Structure
 - src/pages: route pages
@@ -47,7 +62,12 @@ Create `.env` with at minimum:
   - HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy no-referrer
 
 ---
-Docs: See `DOCUMENTATION.md` (this folder) and the root `DOCUMENTATION.md`.
+Testing
+- Tooling: Vitest + Testing Library + jsdom
+- Commands: `npm run test`, `npm run test:ui`
+- Suggested: components (ProductCard/CartDrawer), cart store, i18n labels, axios mocks with CSRF header
+
+Documentation consolidation: Former files (SETUP/ARCHITECTURE/TESTING/DOCUMENTATION/SUMMARY/CHECKLIST/DESIGN) have been merged into this README.
 
 Changelog
 - 2025-09: CSRF handshake documented, default API base set to port 4000, `.htaccess` security notes.

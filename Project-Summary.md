@@ -1,5 +1,7 @@
 ## Epic Pizza & Pasta — Project Summary
 
+Last updated: 2025-09-19
+
 This document is a complete English summary of the project materials, decisions, milestones, technical notes, and next steps for the "Epic Pizza and Pasta" online ordering website. Keep this file as the canonical short-hand guide for development, deployment, and handover.
 
 ---
@@ -58,7 +60,7 @@ This document is a complete English summary of the project materials, decisions,
 - Domain: epicfoodorders.com
 - Contact phone: +66 95 569 7525
 - Contact email: epicpizzaandpasta@gmail.com
-- Address: 1, 15 ซ. นนทบุรี 18/1 Bang Krasor, อำเภอเมืองนนทบุรี นนทบุรี 11000, Thailand
+- Address: 1, 15 Soi Nonthaburi, Bang Krasor, Nonthaburi 11000, Thailand
 - Instagram: https://www.instagram.com/epicpizzaandpasta/
 - Facebook: https://www.facebook.com/epicpizzapasta
 - Opening hours: Daily 12:00 PM - 11:00 PM
@@ -157,3 +159,5 @@ Store secrets in an environment file on the server (never commit to Git). Exampl
 ---
 
 If anything needs to be expanded into a separate technical README or a step-by-step deployment guide, create a follow-up issue and we will produce a dedicated deployment doc and a short staff-training checklist.
+
+See also: Back-End/README.md, Front-End/README.md, and DEPLOYMENT.md

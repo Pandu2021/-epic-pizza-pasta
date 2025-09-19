@@ -1,5 +1,7 @@
 # Front-End Design Brief
 
+Last updated: 2025-09-19
+
 Goal: polished, responsive, accessible Pizza & Pasta storefront with product detail, cart/checkout, auth, order flows, and basic admin scaffolding.
 
 ## Pages (routes)
@@ -12,8 +14,38 @@ Goal: polished, responsive, accessible Pizza & Pasta storefront with product det
 - Order History (/orders): list previous orders (placeholder to integrate backend later).
 - Profile (/profile): basic profile and links to orders.
 - Auth (/login, /register, /forgot-password): forms (placeholder), route guards to be added later.
-- Admin: digantikan oleh Profile. Semua akses `/admin` akan di-redirect ke `/profile`. Jika nanti perlu admin, gunakan sub-path lain atau app terpisah.
+- Admin: area admin tersedia (users, products, orders). Tambahkan proteksi rute/role guard sesuai kebutuhan.
 - 404 (*): friendly not found.
+
+## Status Halaman (Terbaru — 2025-09-19)
+
+Sudah dibuat (berdasarkan berkas nyata di `Front-End/src/pages`):
+- `/` → `HomePage.tsx`
+- `/menu` → `MenuPage.tsx`
+- `/menu/:id` → `ProductPage.tsx`
+- `/cart` → `CartPage.tsx`
+- `/checkout` → `CheckoutPage.tsx`
+- `/order-confirmation` → `OrderConfirmationPage.tsx`
+- `/orders` → `OrderHistoryPage.tsx`
+- `/profile` → `ProfilePage.tsx`
+- `/login` → `LoginPage.tsx`
+- `/register` → `RegisterPage.tsx`
+- `/forgot-password` → `ForgotPasswordPage.tsx`
+- `/contact` → `ContactPage.tsx`
+- `*` (fallback) → `NotFoundPage.tsx`
+
+Admin (implementasi saat ini):
+- `/admin` (entry/overview) → `AdminPage.tsx`
+- `/admin/users` → `admin/AdminUsersPage.tsx`
+- `/admin/products` → `admin/AdminProductsPage.tsx`
+- `/admin/orders` → `admin/AdminOrdersPage.tsx`
+
+Belum dibuat (halaman):
+- Tidak ada halaman inti yang disebut di daftar di atas yang belum dibuat. 
+- Catatan: jika diperlukan di masa depan, kandidat halaman tambahan antara lain:
+	- Halaman “Payment Failed / Retry” terpisah dari konfirmasi
+	- “Order Tracking (live status/polling)”
+	- “Admin Dashboard” ringkasan metrik terpisah dari sub-halaman CRUD
 
 ## Components
 - ProductCard: image, name, badges, price, link to detail + Add to Cart.
@@ -48,3 +80,5 @@ Goal: polished, responsive, accessible Pizza & Pasta storefront with product det
 - Add protected routes and token handling.
 - Integrate backend API in `src/services/api.ts`.
 - Replace placeholders with real data and wire admin CRUD.
+
+See also: README.md

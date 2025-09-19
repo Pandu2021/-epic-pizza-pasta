@@ -1,7 +1,7 @@
 import { PhoneIcon, EnvelopeIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 
-const ADDRESS = '1, 15 ซ. นนทบุรี 18/1 Bang Krasor, อำเภอเมืองนนทบุรี นนทบุรี 11000, Thailand';
+const ADDRESS = '1, 15 Soi Nonthaburi, Bang Krasor, Nonthaburi 11000, Thailand';
 const PHONE = '+66 95 569 7525';
 const EMAIL = 'epicpizzaandpasta@gmail.com';
 
@@ -50,9 +50,17 @@ export default function ContactPage() {
     'saturday',
   ];
 
-  const mapQuery = encodeURIComponent(ADDRESS);
-  const mapEmbed = `https://www.google.com/maps?q=${mapQuery}&z=16&hl=en&output=embed`;
-  const mapLink = `https://www.google.com/maps?q=${mapQuery}`;
+  const lat = import.meta.env.VITE_MAP_LAT;
+  const lng = import.meta.env.VITE_MAP_LNG;
+  const hasCoords = lat && lng;
+  const mapQuery = hasCoords ? `${lat},${lng}` : encodeURIComponent(ADDRESS);
+  // Prefer coordinates when available for higher accuracy; use address fallback
+  const mapEmbed = hasCoords
+    ? `https://www.google.com/maps?q=${mapQuery}&z=17&hl=en&output=embed`
+    : `https://www.google.com/maps?q=${mapQuery}&z=17&hl=en&output=embed`;
+  const mapLink = hasCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${mapQuery}`
+    : `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
 
   return (
     <div className="space-y-8">

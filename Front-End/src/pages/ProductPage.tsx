@@ -30,6 +30,7 @@ export default function ProductPage() {
 
   const [item, setItem] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allPizzas, setAllPizzas] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -38,6 +39,11 @@ export default function ProductPage() {
       try {
         const { data } = await api.get(`/menu/${id}`);
         setItem(data ?? null);
+        // Preload all pizzas for flavor selection (client-side)
+        try {
+          const list = await api.get('/menu', { params: { category: 'pizza' } });
+          setAllPizzas(Array.isArray(list.data) ? list.data : []);
+        } catch {}
       } catch {
         setItem(null);
       } finally {
@@ -51,12 +57,31 @@ export default function ProductPage() {
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
   const [qty, setQty] = useState<number>(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [notes, setNotes] = useState<string>('');
+
+  // Flavor selection state
+  const isSuperSampler = useMemo(() => item?.id === 'pizza-super-sampler', [item]);
+  // singleFlavorId is used when not split; for 50/50 we use halfA/halfB; for sampler we use up to 4
+  const [splitMode, setSplitMode] = useState<'single' | 'half' | 'sampler'>('single');
+  const [halfA, setHalfA] = useState<string | null>(null);
+  const [halfB, setHalfB] = useState<string | null>(null);
+  const [samplerFlavors, setSamplerFlavors] = useState<string[]>([]);
 
   // Set default size when item is loaded and is a pizza; prefer L if available else XL
   useEffect(() => {
     if (!item) return;
     if (!isPizza) return;
     if (item.priceL != null) setSize('L'); else if (item.priceXL != null) setSize('XL');
+    // Set split defaults
+    if (item.id === 'pizza-super-sampler') {
+      setSplitMode('sampler');
+      setSize('XL'); // enforce XL
+    } else {
+      setSplitMode('single');
+      setHalfA(item.id);
+      setHalfB(null);
+      setSamplerFlavors([]);
+    }
   }, [item, isPizza]);
 
   const handleToggleExtra = (extra: Extra) => {
@@ -76,27 +101,95 @@ export default function ProductPage() {
     }, 0);
   }, [selectedExtras, size]);
 
+  // Helper: get pizza price by id and size
+  const getPizzaPrice = (pizzaId: string | null | undefined, sz: 'L' | 'XL'): number => {
+    if (!pizzaId) return 0;
+    const p = (pizzaId === item?.id ? item : allPizzas.find((m) => m.id === pizzaId));
+    if (!p) return 0;
+    return sz === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0);
+  };
+
   const basePrice = useMemo(() => {
-      if (!item) return 0;
-      if (isPizza) {
-          return size === 'XL' ? item.priceXL ?? 0 : item.priceL ?? 0;
-      }
-      return item.price ?? 0;
-  }, [item, isPizza, size]);
+    if (!item) return 0;
+    if (!isPizza) return item.price ?? 0;
+    if (isSuperSampler) {
+      // Flat price XL only
+      return item.priceXL ?? getPizzaPrice(item.id, 'XL');
+    }
+    if (splitMode === 'single') {
+      return getPizzaPrice(halfA || item.id, size);
+    }
+    if (splitMode === 'half') {
+      // 50/50: price = higher of the two flavors selected for the chosen size
+      const a = getPizzaPrice(halfA || item.id, size);
+      const b = getPizzaPrice(halfB || item.id, size);
+      return Math.max(a, b);
+    }
+    return getPizzaPrice(item.id, size);
+  }, [item, isPizza, isSuperSampler, splitMode, size, halfA, halfB, allPizzas]);
 
   const totalPrice = (basePrice + extrasPrice) * qty;
 
   const handleAddToCart = () => {
     if (!item) return;
     const variant = isPizza ? size : 'STD';
-    const displayName = t(item.name) + (isPizza ? ` (${size})` : '');
+    const displayNameBase = t(item.name) + (isPizza ? ` (${size})` : '');
     const extrasString = selectedExtras.map(e => e.name).join(', ');
+    // Build flavors label and options
+    let flavorsLabel = '';
+    let options: Record<string, unknown> | undefined = undefined;
+    if (isPizza) {
+      if (isSuperSampler) {
+        const names = samplerFlavors.map((fid) => {
+          const p = fid === item.id ? item : allPizzas.find((m) => m.id === fid);
+          const nm = p ? (typeof p.name === 'object' ? t(p.name) : (p.name ?? '')) : fid;
+          return nm;
+        });
+        flavorsLabel = names.length ? ` [Sampler: ${names.join(' | ')}]` : '';
+        options = {
+          type: 'sampler',
+          size: 'XL',
+          flavors: samplerFlavors,
+          extras: selectedExtras.map((e) => e.id),
+          notes: notes || undefined
+        };
+      } else if (splitMode === 'half') {
+        const nameA = (() => {
+          const p = halfA === item.id ? item : allPizzas.find((m) => m.id === halfA);
+          return p ? (typeof p.name === 'object' ? t(p.name) : (p.name ?? '')) : '';
+        })();
+        const nameB = (() => {
+          const p = halfB === item.id ? item : allPizzas.find((m) => m.id === halfB);
+          return p ? (typeof p.name === 'object' ? t(p.name) : (p.name ?? '')) : '';
+        })();
+        flavorsLabel = ` [Half: ${nameA || t(item.name)} + ${nameB || t(item.name)}]`;
+        options = {
+          type: 'half-half',
+          size,
+          halfA: halfA || item.id,
+          halfB: halfB || item.id,
+          priceRule: 'max-of-two',
+          extras: selectedExtras.map((e) => e.id),
+          notes: notes || undefined
+        };
+      } else {
+        // single flavor (default)
+        options = {
+          type: 'single',
+          size,
+          flavor: halfA || item.id,
+          extras: selectedExtras.map((e) => e.id),
+          notes: notes || undefined
+        };
+      }
+    }
     
     addItem({
-      id: `${item.id}:${variant}:${selectedExtras.map(e => e.id).join('-')}`,
-      name: `${displayName}${extrasString ? ` - With ${extrasString}` : ''}`,
+      id: `${item.id}:${variant}:${splitMode}:${selectedExtras.map(e => e.id).join('-')}:${(options as any)?.flavors || (options as any)?.flavor || ''}`,
+      name: `${displayNameBase}${flavorsLabel}${extrasString ? ` - With ${extrasString}` : ''}${notes ? ` | Notes: ${notes}` : ''}`,
       price: basePrice + extrasPrice,
-      image: menuImg((item.images && item.images[0]) || item.image)
+      image: menuImg((item.images && item.images[0]) || item.image),
+      options
     }, qty);
 
     setAddedToCart(true);
@@ -161,6 +254,7 @@ export default function ProductPage() {
                   animate={size === 'L' ? { scale: 1.05 } : { scale: 1 }}
                   className={`flex-1 text-center p-4 rounded-lg border-2 transition-colors ${size === 'L' ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
                   onClick={() => setSize('L')}
+                  disabled={isSuperSampler}
                 >
                   <div className="text-xl font-bold">L</div>
                   <div className="text-sm">฿ {item.priceL.toFixed(0)}</div>
@@ -178,6 +272,110 @@ export default function ProductPage() {
                 </motion.button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Flavor selection for pizzas */}
+        {isPizza && !isSuperSampler && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Choose flavors</h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`btn-outline ${splitMode === 'single' ? 'bg-slate-100' : ''}`}
+                onClick={() => setSplitMode('single')}
+              >
+                Single Flavor
+              </button>
+              <button
+                type="button"
+                className={`btn-outline ${splitMode === 'half' ? 'bg-slate-100' : ''}`}
+                onClick={() => setSplitMode('half')}
+              >
+                50/50 (Two Flavors)
+              </button>
+            </div>
+
+            {splitMode === 'single' && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {[item, ...allPizzas.filter((p) => p.id !== item.id && p.id !== 'pizza-super-sampler')].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`p-3 rounded border text-left ${halfA === p.id ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
+                    onClick={() => setHalfA(p.id)}
+                  >
+                    <div className="font-medium">{typeof p.name === 'object' ? t(p.name) : (p.name ?? '')}</div>
+                    <div className="text-xs text-slate-500">฿ {(size === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0)).toFixed(0)}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {splitMode === 'half' && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <div className="text-sm text-slate-600">Half A</div>
+                  {[item, ...allPizzas.filter((p) => p.id !== 'pizza-super-sampler')].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`p-3 rounded border text-left w-full ${halfA === p.id ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
+                      onClick={() => setHalfA(p.id)}
+                    >
+                      <div className="font-medium">{typeof p.name === 'object' ? t(p.name) : (p.name ?? '')}</div>
+                      <div className="text-xs text-slate-500">฿ {(size === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0)).toFixed(0)}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-slate-600">Half B</div>
+                  {[item, ...allPizzas.filter((p) => p.id !== 'pizza-super-sampler')].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`p-3 rounded border text-left w-full ${halfB === p.id ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
+                      onClick={() => setHalfB(p.id)}
+                    >
+                      <div className="font-medium">{typeof p.name === 'object' ? t(p.name) : (p.name ?? '')}</div>
+                      <div className="text-xs text-slate-500">฿ {(size === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0)).toFixed(0)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-slate-500">50/50 price follows the higher-priced half for the selected size.</p>
+          </div>
+        )}
+
+        {/* Super Sampler (XL only) */}
+        {isSuperSampler && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-2">Super Sampler — Choose up to 4 flavors (XL only)</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {allPizzas
+                .filter((p) => p.id !== 'pizza-super-sampler')
+                .map((p) => {
+                  const selected = samplerFlavors.includes(p.id);
+                  const canAdd = selected || samplerFlavors.length < 4;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`p-3 rounded border text-left ${selected ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'} ${!canAdd ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      onClick={() => {
+                        setSamplerFlavors((prev) =>
+                          prev.includes(p.id) ? prev.filter((x) => x !== p.id) : (prev.length < 4 ? [...prev, p.id] : prev)
+                        );
+                      }}
+                      disabled={!canAdd && !selected}
+                    >
+                      <div className="font-medium">{typeof p.name === 'object' ? t(p.name) : (p.name ?? '')}</div>
+                    </button>
+                  );
+                })}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Every 2 slices can be a different flavor. Max 4 flavors.</p>
           </div>
         )}
 
@@ -208,6 +406,18 @@ export default function ProductPage() {
             </div>
           </div>
         )}
+
+        {/* Notes */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-2">Notes (allergies, remove toppings, etc.)</h3>
+          <textarea
+            className="w-full border rounded p-2"
+            rows={3}
+            placeholder="Any special requests?"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
 
         <div className="flex-grow"></div>
 
@@ -240,7 +450,11 @@ export default function ProductPage() {
           <motion.button
             className={`btn w-full mt-4 text-lg py-3 ${addedToCart ? 'bg-emerald-500 hover:bg-emerald-600' : 'btn-primary'}`}
             onClick={handleAddToCart}
-            disabled={addedToCart || !item}
+            disabled={
+              addedToCart || !item ||
+              (isPizza && splitMode === 'half' && (!halfA || !halfB)) ||
+              (isSuperSampler && samplerFlavors.length === 0)
+            }
             whileTap={{ scale: 0.95 }}
           >
             {addedToCart ? (

@@ -7,6 +7,9 @@ export type CartItem = {
   price: number;
   qty: number;
   image?: string;
+  // Arbitrary options to carry size/flavors/extras/notes to backend
+  // Keep it JSON-serializable only
+  options?: Record<string, unknown>;
 };
 
 type CartState = {
