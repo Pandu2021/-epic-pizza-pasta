@@ -1,3 +1,10 @@
+databases:
+  - name: epic-pizza-db
+    plan: free
+    databaseName: epic_pizza
+    user: pizza
+    region: oregon
+
 services:
   - type: web
     name: epic-pizza-backend
@@ -9,30 +16,33 @@ services:
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
-    - key: NODE_ENV
-      value: production
-      # Set DATABASE_URL, COOKIE_SECRET, JWT keys, etc. in Render dashboard or here as sync vars
-    - key: DATABASE_URL
-      sync: false
-    - key: COOKIE_SECRET
-      generateValue: true
-    - key: CORS_ORIGINS
-      value: https://epic-pizza-frontend.onrender.com
-  # Note: preDeployCommand is not supported on free plan; Prisma migrations will run at start.
-
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: epic-pizza-db
+          property: connectionString
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: JWT_PRIVATE_KEY
+        sync: false
+      - key: JWT_PUBLIC_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://epic-pizza-frontend.onrender.com
+  
   - type: web
     name: epic-pizza-frontend
     runtime: static
     rootDir: Front-End
     buildCommand: NPM_CONFIG_PRODUCTION=false npm ci && npm run build
     autoDeploy: true
-    envVars:
-      # Set frontend envs in Render dashboard or here as sync vars
-    - key: VITE_API_BASE_URL
-      sync: false
-    - key: VITE_APP_NAME
-      value: Epic Pizza & Pasta
     staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_APP_NAME
+        value: Epic Pizza & Pasta
     routes:
       - type: rewrite
         source: /*
