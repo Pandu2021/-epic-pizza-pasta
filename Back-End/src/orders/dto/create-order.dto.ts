@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Min, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
 
 export class OrderItemDto {
   @IsString()
@@ -29,8 +29,9 @@ export class CustomerDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsPhoneNumber('TH')
-  phone!: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/[\s-]/g, '') : value))
+  @Matches(/^(\+66\d{8,9}|0\d{9})$/)
+  phone!: string; // Accepts 0XXXXXXXXX or +66XXXXXXXXX
 
   @IsString()
   @IsNotEmpty()

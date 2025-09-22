@@ -126,6 +126,21 @@ See `API-CONTRACT.md` for details.
 ## Deployment
 Behind reverse proxy with HTTPS (HSTS). Configure env & CORS origins. See root `DEPLOYMENT.md` and `render.yaml`.
 
+## Payments: Omise (optional, test mode)
+
+To test card payments with Omise in dev:
+
+- Backend `.env` (server-only):
+   - `OMISE_SECRET_KEY=sk_test_...`
+   - `OMISE_PUBLIC_KEY=pk_test_...` (not strictly needed server-side, but OK)
+- Frontend `.env` (browser):
+   - `VITE_OMISE_PUBLIC_KEY=pk_test_...`
+
+Notes
+- Keys are test-mode; do not use in production. Keep secret key out of git (already in `.gitignore`).
+- After setting keys, restart backend and frontend dev servers so env vars reload.
+- Webhook (if enabled) must be publicly reachable; do not apply CSRF to webhook paths.
+
 ---
 Documentation consolidation: Former files (SETUP/ARCHITECTURE/TESTING/DOCUMENTATION/SUMMARY/CHECKLIST) have been merged into this README. For API details, see `API-CONTRACT.md`. For deployment, see root `DEPLOYMENT.md`.
 

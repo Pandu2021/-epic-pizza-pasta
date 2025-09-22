@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;
   readonly VITE_MAP_LAT?: string;
   readonly VITE_MAP_LNG?: string;
+  readonly VITE_OMISE_PUBLIC_KEY?: string;
 }
 
 interface ImportMeta {

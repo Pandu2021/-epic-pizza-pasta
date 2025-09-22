@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
@@ -68,7 +69,10 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, cb) => {
       const allow = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-      if (!origin || allow.includes(origin)) cb(null, true);
+      const isDev = process.env.NODE_ENV !== 'production';
+      // In development, allow localhost/127.0.0.1 on any port to avoid Vite dev-port drift
+      const devOk = !!origin && isDev && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      if (!origin || allow.includes(origin) || devOk) cb(null, true);
       else cb(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -77,7 +81,25 @@ async function bootstrap() {
     exposedHeaders: ['X-Request-Id'],
   });
 
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    forbidNonWhitelisted: true,
+    transformOptions: { enableImplicitConversion: true },
+    exceptionFactory: (errors) => {
+      const msgs: string[] = [];
+      for (const e of errors) {
+        if (e.constraints) msgs.push(...Object.values(e.constraints));
+        if (e.children && e.children.length) {
+          for (const c of e.children) {
+            if (c.constraints) msgs.push(...Object.values(c.constraints));
+          }
+        }
+      }
+      const message = msgs.filter(Boolean).join('; ') || 'Validation failed';
+      return new (require('@nestjs/common').BadRequestException)(message);
+    },
+  }));
 
   // Enable HSTS in production (assumes HTTPS behind proxy)
   if (process.env.NODE_ENV === 'production') {
@@ -108,6 +130,7 @@ async function bootstrap() {
       '/api/auth/forgot-password',
       // Webhooks should not use CSRF, they are authenticated differently
       '/api/webhooks/promptpay',
+      '/api/webhooks/omise',
     ];
     if (skip.includes(req.path)) return next();
     return (csrfProtection as any)(req, res, next);

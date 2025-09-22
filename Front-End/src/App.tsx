@@ -14,6 +14,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import PaymentFailedPage from './pages/PaymentFailedPage';
 
 export default function App() {
   const location = useLocation();
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+          <Route path="/payment-failed" element={<PaymentFailedPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AnimatePresence>

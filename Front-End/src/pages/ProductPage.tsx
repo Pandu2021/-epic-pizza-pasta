@@ -67,6 +67,17 @@ export default function ProductPage() {
   const [halfB, setHalfB] = useState<string | null>(null);
   const [samplerFlavors, setSamplerFlavors] = useState<string[]>([]);
 
+  // Build unique pizza options (exclude Super Sampler), ensure current item is included once at the top
+  const pizzaOptions = useMemo(() => {
+    const arr = (allPizzas || []).filter((p) => p.id !== 'pizza-super-sampler');
+    const map = new Map<string, any>();
+    if (item && item.category === 'pizza') map.set(item.id, item);
+    for (const p of arr) {
+      if (!map.has(p.id)) map.set(p.id, p);
+    }
+    return Array.from(map.values());
+  }, [allPizzas, item]);
+
   // Set default size when item is loaded and is a pizza; prefer L if available else XL
   useEffect(() => {
     if (!item) return;
@@ -283,7 +294,11 @@ export default function ProductPage() {
               <button
                 type="button"
                 className={`btn-outline ${splitMode === 'single' ? 'bg-slate-100' : ''}`}
-                onClick={() => setSplitMode('single')}
+                onClick={() => {
+                  setSplitMode('single');
+                  // Single flavor must follow the current product
+                  setHalfA(item.id);
+                }}
               >
                 Single Flavor
               </button>
@@ -297,18 +312,10 @@ export default function ProductPage() {
             </div>
 
             {splitMode === 'single' && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {[item, ...allPizzas.filter((p) => p.id !== item.id && p.id !== 'pizza-super-sampler')].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`p-3 rounded border text-left ${halfA === p.id ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
-                    onClick={() => setHalfA(p.id)}
-                  >
-                    <div className="font-medium">{typeof p.name === 'object' ? t(p.name) : (p.name ?? '')}</div>
-                    <div className="text-xs text-slate-500">฿ {(size === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0)).toFixed(0)}</div>
-                  </button>
-                ))}
+              <div className="mt-3 p-3 rounded border border-slate-300 bg-white">
+                <div className="text-sm text-slate-600">Flavor</div>
+                <div className="font-medium">{t(item.name)}</div>
+                <div className="text-xs text-slate-500 mt-1">Fixed to the selected pizza. Change to 50/50 for two flavors.</div>
               </div>
             )}
 
@@ -316,7 +323,7 @@ export default function ProductPage() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="text-sm text-slate-600">Half A</div>
-                  {[item, ...allPizzas.filter((p) => p.id !== 'pizza-super-sampler')].map((p) => (
+                  {pizzaOptions.map((p) => (
                     <button
                       key={p.id}
                       type="button"
@@ -330,7 +337,7 @@ export default function ProductPage() {
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-slate-600">Half B</div>
-                  {[item, ...allPizzas.filter((p) => p.id !== 'pizza-super-sampler')].map((p) => (
+                  {pizzaOptions.map((p) => (
                     <button
                       key={p.id}
                       type="button"

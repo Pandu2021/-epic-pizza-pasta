@@ -2,7 +2,7 @@ import { UserCircleIcon, Cog6ToothIcon, GlobeAltIcon, ArrowRightOnRectangleIcon 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
-import { api } from '../services/api';
+import { api, endpoints } from '../services/api';
 import { motion } from 'framer-motion';
 
 type MeResponse = { user?: { id: string; email: string; name?: string; role: string; phone?: string } };
@@ -15,6 +15,8 @@ const ProfilePage = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<{ name: string; phone: string }>({ name: '', phone: '' });
+  const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; total: number; status: string; payment?: { status: string; method: string } }>>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -25,6 +27,20 @@ const ProfilePage = () => {
         const user = (data as MeResponse).user ?? null;
         setMe(user);
         if (user) setForm({ name: user.name ?? '', phone: user.phone ?? '' });
+        if (user) {
+          setOrdersLoading(true);
+          try {
+            const { data: list } = await endpoints.myOrders();
+            const arr = Array.isArray(list) ? list : [];
+            setOrders(arr);
+          } catch (e) {
+            // ignore
+          } finally {
+            setOrdersLoading(false);
+          }
+        } else {
+          setOrders([]);
+        }
       } catch (e: any) {
   setMe(null);
   setError(t('profile.not_signed_in'));
@@ -148,6 +164,31 @@ const ProfilePage = () => {
               </div>
             )}
           </div>
+
+          {me && (
+            <div className="card p-6">
+              <h2 className="text-xl font-semibold">Order History</h2>
+              {ordersLoading ? (
+                <div className="mt-4 text-slate-500">{t('profile.loading') || 'Loading...'}</div>
+              ) : orders.length === 0 ? (
+                <div className="mt-4 text-slate-500">{t('profile.no_orders') || 'No orders yet.'}</div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {orders.map((o) => (
+                    <Link key={o.id} to={`/order-confirmation?orderId=${o.id}`} className="block p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm text-slate-500">#{o.id.slice(0, 8)} • {new Date(o.createdAt).toLocaleString()}</div>
+                          <div className="text-sm text-slate-500">{(o as any).deliveryType || ''} • {(o.payment?.method || '').toUpperCase()} • {o.payment?.status || o.status}</div>
+                        </div>
+                        <div className="font-medium">THB {o.total}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card p-6">
             <h2 className="text-xl font-semibold">{t('profile.preferences')}</h2>
