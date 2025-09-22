@@ -30,6 +30,8 @@
   "new": "New",
   "no_image": "No image",
 
+  "added_to_cart": "Added!",
+
   "your_cart": "Your Cart",
   "close": "Close",
   "cart_empty": "Your cart is empty",
@@ -112,5 +114,34 @@
         "image": "app-potato-soup.jpg"
       }
     ]
+  }
+  ,
+  "product": {
+    "choose_size": "Choose size",
+    "choose_flavors": "Choose flavors",
+    "single_flavor": "Single Flavor",
+    "half_half": "50/50 (Two Flavors)",
+    "flavor": "Flavor",
+    "fixed_to_selected": "Fixed to the selected pizza. Change to 50/50 for two flavors.",
+    "half_a": "Half A",
+    "half_b": "Half B",
+    "half_rule_hint": "50/50 price follows the higher-priced half for the selected size.",
+    "super_sampler_title": "Super Sampler — Choose up to 4 flavors (XL only)",
+    "super_sampler_hint": "Every 2 slices can be a different flavor. Max 4 flavors.",
+    "add_extras": "Add extras",
+    "extras": {
+      "extra-cheese": "Extra Cheese",
+      "garlic-butter": "Garlic Butter"
+    },
+    "notes_label": "Notes (allergies, remove toppings, etc.)",
+    "notes_placeholder": "Any special requests?",
+    "quantity": "Quantity",
+    "total_price": "Total Price",
+    "cta_added": "Added to Cart!",
+    "cta_add": "Add to Cart",
+    "product_not_found": "Product not found",
+    "back_to_menu": "← Back to menu",
+    "with": "With",
+    "notes_prefix": "Notes"
   }
 }

@@ -17,8 +17,8 @@ type Extra = {
 
 // Define the extras based on the menu
 const extras: Extra[] = [
-  { id: 'extra-cheese', name: 'Extra Cheese', price: { L: 39, XL: 50 }, icon: '🧀' },
-  { id: 'garlic-butter', name: 'Garlic Butter', price: 10, icon: '🧈' },
+  { id: 'extra-cheese', name: 'product.extras.extra-cheese', price: { L: 39, XL: 50 }, icon: '🧀' },
+  { id: 'garlic-butter', name: 'product.extras.garlic-butter', price: 10, icon: '🧈' },
 ];
 
 export default function ProductPage() {
@@ -143,9 +143,9 @@ export default function ProductPage() {
 
   const handleAddToCart = () => {
     if (!item) return;
-    const variant = isPizza ? size : 'STD';
-    const displayNameBase = t(item.name) + (isPizza ? ` (${size})` : '');
-    const extrasString = selectedExtras.map(e => e.name).join(', ');
+  const variant = isPizza ? size : 'STD';
+  const displayNameBase = t(item.name) + (isPizza ? ` (${size})` : '');
+  const extrasString = selectedExtras.map(e => translate(e.name)).join(', ');
     // Build flavors label and options
     let flavorsLabel = '';
     let options: Record<string, unknown> | undefined = undefined;
@@ -197,7 +197,7 @@ export default function ProductPage() {
     
     addItem({
       id: `${item.id}:${variant}:${splitMode}:${selectedExtras.map(e => e.id).join('-')}:${(options as any)?.flavors || (options as any)?.flavor || ''}`,
-      name: `${displayNameBase}${flavorsLabel}${extrasString ? ` - With ${extrasString}` : ''}${notes ? ` | Notes: ${notes}` : ''}`,
+      name: `${displayNameBase}${flavorsLabel}${extrasString ? ` - ${translate('product.with')} ${extrasString}` : ''}${notes ? ` | ${translate('product.notes_prefix')}: ${notes}` : ''}`,
       price: basePrice + extrasPrice,
       image: menuImg((item.images && item.images[0]) || item.image),
       options
@@ -226,9 +226,9 @@ export default function ProductPage() {
   if (!item) {
     return (
       <section className="text-center py-10">
-        <h1 className="text-2xl font-bold">Product not found</h1>
+        <h1 className="text-2xl font-bold">{translate('product.product_not_found')}</h1>
         <Link className="text-brand-primary underline mt-2 inline-block" to="/menu">
-          ← Back to menu
+          {translate('product.back_to_menu')}
         </Link>
       </section>
     );
@@ -257,7 +257,7 @@ export default function ProductPage() {
         {/* Size Options (Only for Pizzas) */}
         {isPizza && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Choose size</h3>
+            <h3 className="text-lg font-semibold mb-3">{translate('product.choose_size')}</h3>
             <div className="flex gap-3">
               {item.priceL != null && (
                 <motion.button
@@ -289,7 +289,7 @@ export default function ProductPage() {
         {/* Flavor selection for pizzas */}
         {isPizza && !isSuperSampler && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Choose flavors</h3>
+            <h3 className="text-lg font-semibold mb-3">{translate('product.choose_flavors')}</h3>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -300,29 +300,29 @@ export default function ProductPage() {
                   setHalfA(item.id);
                 }}
               >
-                Single Flavor
+                {translate('product.single_flavor')}
               </button>
               <button
                 type="button"
                 className={`btn-outline ${splitMode === 'half' ? 'bg-slate-100' : ''}`}
                 onClick={() => setSplitMode('half')}
               >
-                50/50 (Two Flavors)
+                {translate('product.half_half')}
               </button>
             </div>
 
             {splitMode === 'single' && (
               <div className="mt-3 p-3 rounded border border-slate-300 bg-white">
-                <div className="text-sm text-slate-600">Flavor</div>
+                <div className="text-sm text-slate-600">{translate('product.flavor')}</div>
                 <div className="font-medium">{t(item.name)}</div>
-                <div className="text-xs text-slate-500 mt-1">Fixed to the selected pizza. Change to 50/50 for two flavors.</div>
+                <div className="text-xs text-slate-500 mt-1">{translate('product.fixed_to_selected')}</div>
               </div>
             )}
 
             {splitMode === 'half' && (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="space-y-2">
-                  <div className="text-sm text-slate-600">Half A</div>
+                  <div className="text-sm text-slate-600">{translate('product.half_a')}</div>
                   {pizzaOptions.map((p) => (
                     <button
                       key={p.id}
@@ -336,7 +336,7 @@ export default function ProductPage() {
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-slate-600">Half B</div>
+                  <div className="text-sm text-slate-600">{translate('product.half_b')}</div>
                   {pizzaOptions.map((p) => (
                     <button
                       key={p.id}
@@ -351,14 +351,14 @@ export default function ProductPage() {
                 </div>
               </div>
             )}
-            <p className="mt-2 text-xs text-slate-500">50/50 price follows the higher-priced half for the selected size.</p>
+            <p className="mt-2 text-xs text-slate-500">{translate('product.half_rule_hint')}</p>
           </div>
         )}
 
         {/* Super Sampler (XL only) */}
         {isSuperSampler && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-2">Super Sampler — Choose up to 4 flavors (XL only)</h3>
+            <h3 className="text-lg font-semibold mb-2">{translate('product.super_sampler_title')}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {allPizzas
                 .filter((p) => p.id !== 'pizza-super-sampler')
@@ -382,14 +382,14 @@ export default function ProductPage() {
                   );
                 })}
             </div>
-            <p className="mt-2 text-xs text-slate-500">Every 2 slices can be a different flavor. Max 4 flavors.</p>
+            <p className="mt-2 text-xs text-slate-500">{translate('product.super_sampler_hint')}</p>
           </div>
         )}
 
         {/* Extras Options (Only for Pizzas) */}
         {isPizza && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Add extras</h3>
+            <h3 className="text-lg font-semibold mb-3">{translate('product.add_extras')}</h3>
             <div className="space-y-3">
               {extras.map(extra => (
                 <motion.div
@@ -400,7 +400,7 @@ export default function ProductPage() {
                 >
                   <div className="text-3xl">{extra.icon}</div>
                   <div className="flex-grow">
-                    <div className="font-medium">{extra.name}</div>
+                    <div className="font-medium">{translate(extra.name)}</div>
                     <div className="text-sm text-slate-500">
                       {extra.id === 'extra-cheese' && typeof extra.price === 'object' ? `+฿${extra.price[size].toFixed(2)}` : `+฿${(extra.price as number).toFixed(2)}`}
                     </div>
@@ -416,11 +416,11 @@ export default function ProductPage() {
 
         {/* Notes */}
         <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-2">Notes (allergies, remove toppings, etc.)</h3>
+          <h3 className="text-lg font-semibold mb-2">{translate('product.notes_label')}</h3>
           <textarea
             className="w-full border rounded p-2"
             rows={3}
-            placeholder="Any special requests?"
+            placeholder={translate('product.notes_placeholder')}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
@@ -433,7 +433,7 @@ export default function ProductPage() {
           <div className="flex justify-between items-center">
             {/* Quantity Selector */}
             <div className="flex items-center gap-2">
-              <label htmlFor="qty" className="text-sm font-medium">Quantity</label>
+              <label htmlFor="qty" className="text-sm font-medium">{translate('product.quantity')}</label>
               <div className="flex items-center rounded-lg border border-slate-300">
                 <button type="button" aria-label="Decrease quantity" className="px-3 py-2 text-slate-500 hover:bg-slate-100 rounded-l-md" onClick={() => setQty((q) => Math.max(1, q - 1))}><MinusIcon className="h-4 w-4"/></button>
                 <input
@@ -449,7 +449,7 @@ export default function ProductPage() {
             </div>
             {/* Price */}
             <div className="text-right">
-              <div className="text-sm text-slate-500">Total Price</div>
+              <div className="text-sm text-slate-500">{translate('product.total_price')}</div>
               <div className="text-3xl font-bold">฿ {totalPrice.toFixed(0)}</div>
             </div>
           </div>
@@ -466,10 +466,10 @@ export default function ProductPage() {
           >
             {addedToCart ? (
               <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center justify-center">
-                <CheckIcon className="size-6 mr-2" /> Added to Cart!
+                <CheckIcon className="size-6 mr-2" /> {translate('product.cta_added')}
               </motion.div>
             ) : (
-              "Add to Cart"
+              translate('product.cta_add')
             )}
           </motion.button>
         </div>
