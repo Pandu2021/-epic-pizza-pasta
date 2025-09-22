@@ -4,6 +4,11 @@ dist/
 .env
 .env.*
 !.env.example
+*.env.*.local
+*.env.local
+.envrc
+direnv.toml
+\.envrc
 *.env.local
 *.secret
 secrets/
@@ -18,6 +23,9 @@ logs/
 Thumbs.db
 .vscode/*
 !.vscode/tasks.json
+*.code-workspace
+.history/
+.fleet/
 
 # Editor / system
 *.swp
@@ -34,6 +42,7 @@ cache/
 .vite/
 .turbo/
 .parcel-cache/
+.cache-loader/
 
 # More certificate/key formats
 *.pfx

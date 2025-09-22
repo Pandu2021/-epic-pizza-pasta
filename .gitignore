@@ -17,6 +17,11 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+*.env.*.local
+*.env.local
+.envrc
+direnv.toml
+\.envrc
 *.env.local
 *.secret
 secrets/
@@ -57,6 +62,14 @@ Desktop.ini
 .vite/
 .turbo/
 .parcel-cache/
+.cache-loader/
+.eslintcache*
+
+# IDE
+.idea/
+.history/
+.fleet/
+*.code-workspace
 
 # More certificate/key formats
 *.pfx
@@ -68,6 +81,9 @@ Desktop.ini
 *.sqlite
 *.db
 dump/
+
+# Prisma local env (do not commit)
+Back-End/prisma/.env
 
 # Do not ignore Prisma migration files
 !Back-End/prisma/migrations/**

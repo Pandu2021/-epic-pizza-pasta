@@ -5,6 +5,11 @@ dist/
 .env
 .env.*
 !.env.example
+*.env.*.local
+*.env.local
+.envrc
+direnv.toml
+\.envrc
 *.env.local
 *.secret
 secrets/
@@ -27,6 +32,9 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/tasks.json
+*.code-workspace
+.history/
+.fleet/
 
 # Debug artifacts
 npm-debug.log*
@@ -41,6 +49,7 @@ cache/
 nyc-output/
 *.tsbuildinfo
 tsbuildinfo.json
+.cache-loader/
 
 # Runtime pids
 *.pid
@@ -63,6 +72,9 @@ prisma/*.sqlite
 *.sqlite
 *.db
 dump/
+
+# Prisma local env (do not commit)
+prisma/.env
 
 # Do not ignore Prisma migration files
 !prisma/migrations/**
