@@ -24,6 +24,43 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "build-and-test-backend",
+			"type": "shell",
+			"command": "npm run build ; npm test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "backend:build",
+			"type": "shell",
+			"command": "npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "backend:build+test",
+			"type": "shell",
+			"command": "npm run build ; npm test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "create tasks.json: build+test",
+			"type": "shell",
+			"command": "echo tasks",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

@@ -1,4 +1,4 @@
-import { UserCircleIcon, Cog6ToothIcon, GlobeAltIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { UserCircleIcon, Cog6ToothIcon, GlobeAltIcon, ArrowRightOnRectangleIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
@@ -15,8 +15,14 @@ const ProfilePage = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<{ name: string; phone: string }>({ name: '', phone: '' });
-  const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; total: number; status: string; payment?: { status: string; method: string } }>>([]);
+  const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; total: number; status: string; deliveryType?: string; payment?: { status: string; method: string } }>>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  // New: pagination & filters
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10); // default 10 per request
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>('all'); // all | received | preparing | completed | cancelled
+  const [filterMethod, setFilterMethod] = useState<string>('all'); // all | promptpay | card | cod
 
   useEffect(() => {
     (async () => {
@@ -79,6 +85,24 @@ const ProfilePage = () => {
     if (me.phone) score += 20;
     return score;
   }, [me]);
+
+  // Derived filtered + paginated
+  const filteredOrders = useMemo(() => {
+    let arr = orders;
+    if (filterStatus !== 'all') arr = arr.filter(o => (o.status || '').toLowerCase() === filterStatus);
+    if (filterMethod !== 'all') arr = arr.filter(o => (o.payment?.method || '').toLowerCase() === filterMethod);
+    return arr;
+  }, [orders, filterStatus, filterMethod]);
+
+  const totalItems = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const pageEnd = pageStart + pageSize;
+  const pageSlice = filteredOrders.slice(pageStart, pageEnd);
+
+  // Reset page when filters/pageSize change
+  useEffect(() => { setPage(1); }, [filterStatus, filterMethod, pageSize]);
 
   return (
     <motion.div
@@ -168,24 +192,80 @@ const ProfilePage = () => {
           {me && (
             <div className="card p-6">
               <h2 className="text-xl font-semibold">Order History</h2>
+              {/* Controls: filter toggle, page size */}
+              {orders.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button className="btn-outline" onClick={() => setShowFilters(v => !v)}>
+                    <FunnelIcon className="h-5 w-5 mr-2" /> {'Profile Hide Filters'}
+                  </button>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-slate-500">{'Profile Page Size'}</span>
+                    <select aria-label={'Profile Page Size'} className="input !py-1 !px-2" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                    </select>
+                    <span className="text-slate-500">{'Profile Items'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Filters panel */}
+              {showFilters && (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">{'Profile Filter Status'}</label>
+                    <select aria-label={'Profile Filter Status'} className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                      <option value="all">{'Profile All'}</option>
+                      <option value="received">{t('order.status.received') || 'Received'}</option>
+                      <option value="preparing">{t('order.status.preparing') || 'Preparing'}</option>
+                      <option value="completed">{t('order.status.completed') || 'Completed'}</option>
+                      <option value="cancelled">{t('order.status.cancelled') || 'Cancelled'}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">{'Profile Filter Payment'}</label>
+                    <select aria-label={'Profile Filter Payment'} className="input" value={filterMethod} onChange={e => setFilterMethod(e.target.value)}>
+                      <option value="all">{'Profile All'}</option>
+                      <option value="promptpay">PromptPay</option>
+                      <option value="card">Card</option>
+                      <option value="cod">COD</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {ordersLoading ? (
                 <div className="mt-4 text-slate-500">{t('profile.loading') || 'Loading...'}</div>
               ) : orders.length === 0 ? (
-                <div className="mt-4 text-slate-500">{t('profile.no_orders') || 'No orders yet.'}</div>
+                <div className="mt-4 text-slate-500">{'Profile No Orders'}</div>
               ) : (
-                <div className="mt-4 space-y-3">
-                  {orders.map((o) => (
-                    <Link key={o.id} to={`/order-confirmation?orderId=${o.id}`} className="block p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm text-slate-500">#{o.id.slice(0, 8)} • {new Date(o.createdAt).toLocaleString()}</div>
-                          <div className="text-sm text-slate-500">{(o as any).deliveryType || ''} • {(o.payment?.method || '').toUpperCase()} • {o.payment?.status || o.status}</div>
+                <>
+                  <div className="mt-4 space-y-3">
+                    {pageSlice.map((o) => (
+                      <Link key={o.id} to={`/order-confirmation?orderId=${o.id}`} className="block p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm text-slate-500">#{o.id.slice(0, 8)} • {new Date(o.createdAt).toLocaleString()}</div>
+                            <div className="text-sm text-slate-500">{(o as any).deliveryType || ''} • {(o.payment?.method || '').toUpperCase()} • {o.payment?.status || o.status}</div>
+                          </div>
+                          <div className="font-medium">THB {o.total}</div>
                         </div>
-                        <div className="font-medium">THB {o.total}</div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* Pagination footer */}
+                  <div className="mt-4 flex items-center justify-between text-sm">
+                    <div className="text-slate-600">
+                      {'Profile Showing'} {totalItems === 0 ? 0 : pageStart + 1}-{Math.min(pageEnd, totalItems)} {'Profile of'} {totalItems}
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn-outline" disabled={currentPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>{'Profile Prev'}</button>
+                      <span className="self-center text-slate-500">{currentPage} / {totalPages}</span>
+                      <button className="btn-outline" disabled={currentPage >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>{'Profile Next'}</button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}

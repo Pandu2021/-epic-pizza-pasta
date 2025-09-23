@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildPromptPayPayload } from '../utils/promptpay';
 import { prisma } from '../prisma';
+import { appendOrderToSheet } from '../utils/sheets';
+import { enqueue } from '../utils/job-queue';
 
 @Injectable()
 export class OrdersService {
@@ -166,6 +168,42 @@ export class OrdersService {
       where: { id },
       include: { items: true, payment: true },
     });
+    // Enqueue Google Sheets append (non-blocking) with retry & DB log
+    if (order && process.env.GOOGLE_SHEET_ID) {
+      const payload = {
+        id: order.id,
+        customerName: order.customerName,
+        phone: order.phone,
+        address: order.address,
+        deliveryType: order.deliveryType,
+        subtotal: order.subtotal,
+        deliveryFee: order.deliveryFee,
+        tax: order.tax,
+        discount: order.discount,
+        total: order.total,
+        paymentMethod: order.paymentMethod,
+        status: order.status,
+        createdAt: order.createdAt,
+        items: order.items?.map((it) => ({ nameSnapshot: it.nameSnapshot, qty: it.qty, priceSnapshot: it.priceSnapshot })),
+        payment: { status: order.payment?.status },
+      } as const;
+
+      enqueue({
+        id: `sheets:${order.id}`,
+        run: async () => {
+          const ok = await appendOrderToSheet(payload);
+          await prisma.webhookEvent.create({
+            data: {
+              type: ok ? 'sheets.append.success' : 'sheets.append.failure',
+              payload: payload as any,
+            },
+          });
+          if (!ok) throw new Error('appendOrderToSheet returned false');
+        },
+        maxRetries: 5,
+        baseDelayMs: 1500,
+      });
+    }
     return order;
   }
 
