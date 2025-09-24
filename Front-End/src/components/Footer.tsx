@@ -25,8 +25,6 @@ export default function Footer() {
   const { t } = useTranslation();
   const todayKey = getBangkokDay();
   const todayHours = HOURS[todayKey];
-  // Brand logo from assets
-  const logoUrl = new URL('../assets/images/logo/logo.png', import.meta.url).href;
   const getBangkokMinutesNow = () => {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Bangkok',
@@ -45,18 +43,9 @@ export default function Footer() {
     <footer className="mt-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100">
       <div className="container px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {/* Brand */}
+          {/* Brand (text only now; logo moved to header) */}
           <div>
-            <div className="flex items-center gap-3">
-              <img
-                src={logoUrl}
-                alt="Epic Pizza & Pasta"
-                className="h-12 w-12 rounded-xl object-contain bg-white/5"
-                loading="lazy"
-              />
-              <div className="sr-only">Epic Pizza & Pasta</div>
-            </div>
-            <div className="mt-3 text-xl font-bold">Epic Pizza & Pasta</div>
+            <div className="text-xl font-bold">Epic Pizza & Pasta</div>
 
             <div className="mt-5 space-y-2 text-sm text-slate-300">
               <div>

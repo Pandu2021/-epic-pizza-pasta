@@ -44,7 +44,17 @@ export default function Layout({ children }: Props) {
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-20">
   <div className="container px-4 py-3 flex items-center gap-3">
-          <Link to="/" className="font-bold text-lg">Epic Pizza & Pasta</Link>
+          {/* Brand logo moved from Footer to Header */}
+          <Link to="/" className="shrink-0 inline-flex items-center" aria-label="Epic Pizza & Pasta">
+            <img
+              src={new URL('../assets/images/logo/logo.png', import.meta.url).href}
+              alt="Epic Pizza & Pasta"
+              className="h-12 w-12 rounded-lg object-contain"
+              width={48}
+              height={48}
+              loading="eager"
+            />
+          </Link>
           <form className="relative flex-1 hidden md:block" onSubmit={onSubmit} role="search" aria-label="Site">
             <MagnifyingGlassIcon className="size-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
