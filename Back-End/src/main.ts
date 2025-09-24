@@ -7,6 +7,7 @@ import hpp from 'hpp';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import pinoHttp from 'pino-http';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import csrf from 'csurf';
 import { ValidationPipe } from '@nestjs/common';
@@ -43,12 +44,18 @@ async function bootstrap() {
     req.id = req.id || cryptoRandomId();
     next();
   });
-  app.use(pinoHttp({
-    genReqId: (req: any) => req.id || cryptoRandomId(),
-    autoLogging: true,
-    customProps: (req: any) => ({ reqId: req.id }),
-  }));
-  app.use(morgan('combined'));
+  const enableHttpLog = process.env.HTTP_LOG !== 'false';
+  if (enableHttpLog) {
+    app.use(pinoHttp({
+      genReqId: (req: any) => req.id || cryptoRandomId(),
+      autoLogging: true,
+      customProps: (req: any) => ({ reqId: req.id }),
+    }));
+    app.use(morgan('combined'));
+  }
+
+  // Gzip / brotli compression (helps JSON menu payload delivery)
+  app.use(compression());
 
   // Basic rate limit (adjust per route as needed)
   app.use(
@@ -149,6 +156,18 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT || 4000);
   await app.listen(port);
+  // Prewarm menu cache optionally to reduce first-hit latency
+  if (process.env.PREWARM_MENU === 'true') {
+    try {
+      const { prisma } = await import('./prisma');
+      await prisma.menuItem.findMany({ take: 1 }); // touch connection
+      // warm list all
+      const items = await prisma.menuItem.findMany({ orderBy: { updatedAt: 'desc' } });
+      console.log(`[prewarm] Cached ${items.length} menu items`);
+    } catch (e) {
+      console.warn('[prewarm] failed', e);
+    }
+  }
   // eslint-disable-next-line no-console
   console.log(`API running on http://localhost:${port}`);
 }

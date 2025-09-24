@@ -66,7 +66,21 @@ export class MenuController {
       return cached.data;
     }
     const where = category ? { category } : ({} as any);
-    const items = await prisma.menuItem.findMany({ where, orderBy: { updatedAt: 'desc' } });
+    const items = await prisma.menuItem.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        category: true,
+        name: true,
+        description: true,
+        images: true,
+        priceL: true,
+        priceXL: true,
+        basePrice: true,
+        updatedAt: true,
+      }
+    });
     if (items.length > 0) {
       setCache(listCache, key, items);
       return items;
@@ -80,7 +94,20 @@ export class MenuController {
 
   @Get(':id')
   async get(@Param('id') id: string) {
-  const item = await prisma.menuItem.findUnique({ where: { id } });
+  const item = await prisma.menuItem.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      category: true,
+      name: true,
+      description: true,
+      images: true,
+      priceL: true,
+      priceXL: true,
+      basePrice: true,
+      updatedAt: true,
+    }
+  });
   if (item) return item;
   const json = loadJsonMenu();
   return json.find((m) => m.id === id) ?? null;

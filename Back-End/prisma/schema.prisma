@@ -31,11 +31,11 @@ model MenuItem {
   options     Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  /// Suggested indexes to speed up common menu queries (list by category, ordering by updatedAt)
+  @@index([category])
+  @@index([updatedAt])
+  @@index([category, updatedAt])
 }
-
-/// Suggested indexes to speed up common menu queries (list by category, ordering by updatedAt)
-@@index([category])
-@@index([updatedAt])
 
 model OrderItem {
   id            String  @id @default(uuid())
