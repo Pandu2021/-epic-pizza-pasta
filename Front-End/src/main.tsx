@@ -6,8 +6,12 @@ import './styles/index.css';
 import './i18n';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import { setFavicon } from './utils/favicon';
 
 const queryClient = new QueryClient();
+
+// Ensure favicon set to company logo (overrides placeholder SVG in index.html if present)
+setFavicon();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
