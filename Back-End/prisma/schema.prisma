@@ -33,6 +33,10 @@ model MenuItem {
   updatedAt   DateTime @updatedAt
 }
 
+/// Suggested indexes to speed up common menu queries (list by category, ordering by updatedAt)
+@@index([category])
+@@index([updatedAt])
+
 model OrderItem {
   id            String  @id @default(uuid())
   orderId       String

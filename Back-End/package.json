@@ -20,6 +20,7 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
     "seed:menu": "tsx prisma/seed/menu.seed.ts",
+  "sheets:rebuild": "tsx scripts/rebuild-orders-sheet.ts",
     "db:create:utf8": "tsx scripts/create-utf8-db.ts",
     "prepare": "husky install || true",
     "test:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/test-all.ps1",

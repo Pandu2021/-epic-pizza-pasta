@@ -76,12 +76,15 @@ export async function appendOrderToSheet(order: OrderLike): Promise<boolean> {
 				order.total,
 				order.paymentMethod,
 				paymentStatus,
+				order.status || '', // OrderStatus column (logical status)
+				'', // Driver (future use)
+				'', // DeliveredAt (future use)
 			],
 		];
 
 		await sheets.spreadsheets.values.append({
 			spreadsheetId: sheetId,
-			range: 'Orders!A1:N1',
+			range: 'Orders!A1:Q1',
 			valueInputOption: 'USER_ENTERED',
 			requestBody: { values },
 		});
@@ -165,6 +168,7 @@ export async function ensureOrdersHeader(
 		'Total',
 		'Method',
 		'PaymentStatus',
+		'OrderStatus', // newly added column for logical status changes (cancelled, refunded, etc.)
 	];
 
 	let hasHeader = false;
@@ -182,27 +186,148 @@ export async function ensureOrdersHeader(
 	}
 
 	if (!hasHeader) {
-		// Try to create the sheet if missing; ignore errors if it exists.
 		try {
 			await sheets.spreadsheets.batchUpdate({
 				spreadsheetId,
-				requestBody: {
-					requests: [
-						{ addSheet: { properties: { title: 'Orders' } } },
-					],
-				},
+				requestBody: { requests: [ { addSheet: { properties: { title: 'Orders' } } } ] },
 			});
 		} catch (e: any) {
 			const msg = e?.response?.data?.error?.message || e?.message || e;
 			console.warn('[sheets] addSheet warning:', msg);
 		}
-		// Now set header values in A1:N1
+		// Header now has one more column (A1:O1)
 		await sheets.spreadsheets.values.update({
 			spreadsheetId,
-			range: 'Orders!A1:N1',
+			range: 'Orders!A1:O1',
 			valueInputOption: 'RAW',
 			requestBody: { values: [HEADER] },
 		});
+	}
+}
+
+// Update (or append missing) logical order status (independent from payment status)
+export async function updateOrderStatusInSheet(orderId: string, newStatus: string): Promise<boolean> {
+	const sheetId = process.env.GOOGLE_SHEET_ID || process.env.GOOGLE_SHEETS_ID;
+	const svcEmail = process.env.GOOGLE_SHEET_SERVICE_EMAIL || process.env.GOOGLE_SHEETS_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+	const pk = process.env.GOOGLE_SHEETS_PRIVATE_KEY || process.env.GOOGLE_SHEET_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+	if (!sheetId || !svcEmail || !pk) {
+		console.warn('[sheets.updateStatus] Sheets not configured');
+		return false;
+	}
+	try {
+		const jwt = new google.auth.JWT({ email: svcEmail, key: normalizePrivateKey(pk), scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+		const sheets = google.sheets({ version: 'v4', auth: jwt });
+		// Ensure header (will also add OrderStatus column if missing fresh sheet)
+		await ensureOrdersHeader(sheets, sheetId).catch(() => {});
+
+		// Get all current rows
+		const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Orders!A:O' });
+		const rows = (res.data as any)?.values as string[][] | undefined;
+		if (!rows || rows.length < 2) {
+			console.warn('[sheets.updateStatus] No data rows to update');
+			return false;
+		}
+		const header = rows[0];
+		const orderIdCol = header.indexOf('Order ID');
+		const orderStatusCol = header.indexOf('OrderStatus');
+		if (orderIdCol === -1 || orderStatusCol === -1) {
+			console.warn('[sheets.updateStatus] Required columns missing');
+			return false;
+		}
+		// Find row index (1-based in sheet, 0-based in array; header = 0)
+		let targetRow: number | null = null;
+		for (let i = 1; i < rows.length; i++) {
+			if (rows[i][orderIdCol] === orderId) {
+				targetRow = i; break;
+			}
+		}
+		if (targetRow == null) {
+			console.warn('[sheets.updateStatus] Order ID not found', orderId);
+			return false;
+		}
+		// Build A1 notation for the cell (columns: A=0 -> convert)
+		const colLetter = columnNumberToLetter(orderStatusCol + 1); // +1 because columnNumberToLetter is 1-based
+		const range = `Orders!${colLetter}${targetRow + 1}`; // +1 to convert array index to sheet row number
+		await sheets.spreadsheets.values.update({
+			spreadsheetId: sheetId,
+			range,
+			valueInputOption: 'USER_ENTERED',
+			requestBody: { values: [[newStatus]] },
+		});
+		console.log(`[sheets.updateStatus] Updated order ${orderId} => ${newStatus}`);
+		return true;
+	} catch (e: any) {
+		const detail = e?.response?.data?.error?.message || e?.message || e;
+		console.error('[sheets.updateStatus] failed:', detail);
+		return false;
+	}
+}
+
+function columnNumberToLetter(num: number): string {
+	let s = '';
+	while (num > 0) {
+		const mod = (num - 1) % 26;
+		s = String.fromCharCode(65 + mod) + s;
+		num = Math.floor((num - mod) / 26);
+	}
+	return s;
+}
+
+// Rebuild entire sheet (Orders) from given dataset (orders already enriched with items + payment)
+// This purposely replaces all rows except header. For large datasets consider batching.
+export async function rebuildOrdersSheet(orders: Array<OrderLike & { payment?: any }>): Promise<boolean> {
+	const sheetId = process.env.GOOGLE_SHEET_ID || process.env.GOOGLE_SHEETS_ID;
+	const svcEmail = process.env.GOOGLE_SHEET_SERVICE_EMAIL || process.env.GOOGLE_SHEETS_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+	const pk = process.env.GOOGLE_SHEETS_PRIVATE_KEY || process.env.GOOGLE_SHEET_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+	if (!sheetId || !svcEmail || !pk) {
+		console.warn('[sheets.rebuild] Sheets not configured');
+		return false;
+	}
+	try {
+		const jwt = new google.auth.JWT({ email: svcEmail, key: normalizePrivateKey(pk), scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+		const sheets = google.sheets({ version: 'v4', auth: jwt });
+		await ensureOrdersHeader(sheets, sheetId).catch(() => {});
+
+		// Clear existing (except header). Use batchUpdate -> updateCells? Simpler: clear A2:Q
+		await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: 'Orders!A2:Q' });
+
+		if (!orders.length) return true;
+
+		const values = orders.map(o => {
+			const when = o.createdAt ? new Date(o.createdAt) : new Date();
+			const paymentStatus = (o.payment?.status as string | undefined) || 'unknown';
+			return [
+				when.toISOString(),
+				o.id,
+				o.customerName,
+				o.phone,
+				o.address,
+				o.deliveryType || '',
+				buildItemsSummary(o.items),
+				o.subtotal,
+				o.deliveryFee,
+				o.tax,
+				o.discount,
+				o.total,
+				o.paymentMethod,
+				paymentStatus,
+				o.status || '',
+				'', // Driver placeholder
+				'', // DeliveredAt placeholder
+			];
+		});
+		// Batch write in one request
+		await sheets.spreadsheets.values.update({
+			spreadsheetId: sheetId,
+			range: 'Orders!A2:Q2',
+			valueInputOption: 'RAW',
+			requestBody: { values },
+		});
+		console.log(`[sheets.rebuild] Wrote ${values.length} rows`);
+		return true;
+	} catch (e: any) {
+		console.error('[sheets.rebuild] failed:', e?.message || e);
+		return false;
 	}
 }
 

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildPromptPayPayload } from '../utils/promptpay';
 import { prisma } from '../prisma';
-import { appendOrderToSheet } from '../utils/sheets';
+import { appendOrderToSheet, updateOrderStatusInSheet } from '../utils/sheets';
 import { enqueue } from '../utils/job-queue';
 
 @Injectable()
@@ -209,6 +209,23 @@ export class OrdersService {
 
   async cancel(id: string) {
     const order = await prisma.order.update({ where: { id }, data: { status: 'cancelled' } });
+    if (order && process.env.GOOGLE_SHEET_ID) {
+      enqueue({
+        id: `sheets:update-status:${order.id}`,
+        run: async () => {
+          const ok = await updateOrderStatusInSheet(order.id, 'cancelled');
+          await prisma.webhookEvent.create({
+            data: {
+              type: ok ? 'sheets.status.success' : 'sheets.status.failure',
+              payload: { id: order.id, status: 'cancelled' } as any,
+            },
+          });
+          if (!ok) throw new Error('updateOrderStatusInSheet failed');
+        },
+        maxRetries: 5,
+        baseDelayMs: 1500,
+      });
+    }
     return order;
   }
 }

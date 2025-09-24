@@ -52,7 +52,14 @@ export default function ProductPage() {
     })();
   }, [id]);
 
+  // A pizza item is identified by having size-based prices (priceL / priceXL)
   const isPizza = useMemo(() => !!(item && (item.priceL || item.priceXL)), [item]);
+  // Normalize base price for non-pizza (DB uses basePrice; JSON fallback may have price)
+  const normalizedBasePrice = useMemo(() => {
+    if (!item) return 0;
+    if (isPizza) return 0; // pizzas handled separately with priceL/priceXL logic below
+    return item.basePrice ?? item.price ?? 0; // production DB returns basePrice, JSON fallback has price
+  }, [item, isPizza]);
   const [size, setSize] = useState<'L' | 'XL'>('L');
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
   const [qty, setQty] = useState<number>(1);
@@ -122,7 +129,7 @@ export default function ProductPage() {
 
   const basePrice = useMemo(() => {
     if (!item) return 0;
-    if (!isPizza) return item.price ?? 0;
+    if (!isPizza) return normalizedBasePrice;
     if (isSuperSampler) {
       // Flat price XL only
       return item.priceXL ?? getPizzaPrice(item.id, 'XL');
@@ -137,7 +144,7 @@ export default function ProductPage() {
       return Math.max(a, b);
     }
     return getPizzaPrice(item.id, size);
-  }, [item, isPizza, isSuperSampler, splitMode, size, halfA, halfB, allPizzas]);
+  }, [item, isPizza, isSuperSampler, splitMode, size, halfA, halfB, allPizzas, normalizedBasePrice]);
 
   const totalPrice = (basePrice + extrasPrice) * qty;
 
