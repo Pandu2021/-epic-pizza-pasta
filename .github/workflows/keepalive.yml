@@ -1,0 +1,23 @@
+name: keepalive
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (sparse)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/keepalive.mjs
+          sparse-checkout-cone-mode: false
+      - name: Run keepalive ping
+        env:
+          KEEPALIVE_URL: ${{ secrets.KEEPALIVE_URL }}
+        run: |
+          node scripts/keepalive.mjs --once
