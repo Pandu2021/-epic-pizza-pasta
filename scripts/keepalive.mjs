@@ -59,10 +59,11 @@ async function main(){
   const once = rawArgs.includes('--once');
   const cleaned = rawArgs.filter(a=>!a.startsWith('--'));
   const positional = cleaned.filter(a => /^(https?:)/i.test(a));
-  const url = process.env.KEEPALIVE_URL || positional[0];
+  let url = process.env.KEEPALIVE_URL || positional[0];
   if (!url) {
-    console.error('Usage: KEEPALIVE_URL="https://your-app.onrender.com/health" node scripts/keepalive.mjs [--once] [https://override]');
-    process.exit(1);
+    // Default fallback set per user request
+    url = 'https://epicfoodorders.com/menu';
+    console.log('[keepalive] No KEEPALIVE_URL provided. Using default:', url);
   }
   const intervalMinutes = Number(process.env.KEEPALIVE_INTERVAL_MINUTES) || DEFAULT_INTERVAL_MINUTES;
 

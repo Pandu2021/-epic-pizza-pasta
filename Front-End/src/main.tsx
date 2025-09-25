@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './styles/index.css';
+import './styles/pizza-car-progress.css';
 import './i18n';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useCart } from '../store/cartStore';
+import { useAuth } from '../store/authStore';
 import { endpoints } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -33,9 +34,12 @@ type FormValues = z.infer<typeof schema>;
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, total, clear } = useCart();
+  const { user, loading: authLoading, fetchMe } = useAuth();
+  const mountedRef = useRef(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [breakdown, setBreakdown] = useState<{ subtotal: number; deliveryFee: number; tax: number; discount: number; total: number; expectedReadyAt?: string; expectedDeliveryAt?: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -47,20 +51,47 @@ export default function CheckoutPage() {
     watch,
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { deliveryMethod: 'delivery', paymentMethod: 'promptpay' } });
 
-  const amount = useMemo(() => total(), [total]);
+  // Raw cart subtotal (without delivery/tax)
+  const cartSubtotal = useMemo(() => total(), [total]);
+  const deliveryMethod = watch('deliveryMethod');
+  const paymentMethod = watch('paymentMethod');
+
+  // Local preview breakdown BEFORE order is created (mirrors backend logic simplified)
+  const previewBreakdown = useMemo(() => {
+    if (items.length === 0) return null;
+    const subtotal = items.reduce((s, it) => s + Math.round(it.price) * Math.max(1, Math.round(it.qty)), 0);
+    const FREE_DELIVERY_THRESHOLD = 600;
+    const baseDelivery = deliveryMethod === 'delivery' ? 39 : 0;
+    const deliveryFee = deliveryMethod === 'delivery' && subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : baseDelivery;
+    const vatRate = Number(import.meta.env.VITE_THAI_VAT_RATE || 0.07);
+    const tax = Math.round((subtotal + deliveryFee) * vatRate);
+    const discount = 0;
+    const totalAmount = subtotal + deliveryFee + tax - discount;
+    return { subtotal, deliveryFee, tax, discount, total: totalAmount, freeDeliveryThreshold: FREE_DELIVERY_THRESHOLD } as any;
+  }, [items, deliveryMethod]);
+
+  // Final breakdown (prefer backend result after order creation, else preview)
+  const effectiveBreakdown = breakdown || previewBreakdown;
+  const displayTotal = effectiveBreakdown ? effectiveBreakdown.total : cartSubtotal;
   const isCartEmpty = items.length === 0;
 
+  const MIN_ORDER = 99;
   const onSubmit = async (data: FormValues) => {
     setError(null);
     if (items.length === 0) {
       setError('Your cart is empty.');
       return;
     }
+    if (previewBreakdown && previewBreakdown.subtotal < MIN_ORDER) {
+      setError(`Minimum order is THB ${MIN_ORDER}. Add more items.`);
+      return;
+    }
+    if (creating) return;
     try {
       setCreating(true);
       // 1) Create order in backend
       const payload = {
-        customer: { name: data.name, phone: data.phone, address: data.address },
+        customer: { name: data.name.trim(), phone: data.phone.replace(/[\s-]/g,'') , address: data.address.trim() },
         items: items.map((it) => ({ id: it.id, name: it.name, qty: Math.round(it.qty), price: Math.round(it.price), options: it.options ?? undefined })),
         delivery: { type: data.deliveryMethod, fee: data.deliveryMethod === 'delivery' ? 39 : 0 },
         paymentMethod: data.paymentMethod
@@ -71,9 +102,11 @@ export default function CheckoutPage() {
         orderId: string;
         status: string;
         amountTotal: number;
+        subtotal: number; deliveryFee: number; tax: number; discount: number; expectedReadyAt?: string; expectedDeliveryAt?: string;
         payment?: { type: string; qrPayload?: string; status: string };
       };
       setOrderId(created.orderId);
+      setBreakdown({ subtotal: created.subtotal, deliveryFee: created.deliveryFee, tax: created.tax, discount: created.discount, total: created.amountTotal, expectedReadyAt: created.expectedReadyAt, expectedDeliveryAt: created.expectedDeliveryAt });
 
       // 2) Payment flow by method
       if (data.paymentMethod === 'promptpay') {
@@ -82,12 +115,12 @@ export default function CheckoutPage() {
         let qrImg: string | null = null;
         if (created.orderId) {
           try {
-            const r = await endpoints.createOmisePromptPay({ orderId: created.orderId, amount: created.amountTotal ?? amount });
+            const r = await endpoints.createOmisePromptPay({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total });
             qr = (r.data?.qrPayload as string) || null;
             qrImg = (r.data?.qrImageUrl as string) || null;
           } catch {
             // fallback to local payload
-            const qrRes = await endpoints.createPromptPay({ orderId: created.orderId, amount: created.amountTotal ?? amount });
+            const qrRes = await endpoints.createPromptPay({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total });
             qr = qrRes.data.qrPayload as string;
           }
         }
@@ -135,7 +168,7 @@ export default function CheckoutPage() {
         let ok = false;
         let failMsg: string | undefined;
         try {
-          const chargeRes = await endpoints.omiseCharge({ orderId: created.orderId, amount: created.amountTotal ?? amount, token });
+          const chargeRes = await endpoints.omiseCharge({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total, token });
           ok = !!chargeRes.data?.ok;
           if (!ok) failMsg = chargeRes.data?.message || 'Card charge failed. Please try another card.';
         } catch (err: any) {
@@ -189,11 +222,55 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  // Auth gate: fetch user once; if unauth after load, redirect to login preserving next
+  useEffect(() => {
+    (async () => {
+      try { await fetchMe(); } catch {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate(`/login?next=${encodeURIComponent('/checkout')}`);
+    }
+  }, [authLoading, user, navigate]);
+
+  // Redirect if cart emptied (after mount) and no order in progress
+  useEffect(() => {
+    if (mountedRef.current && items.length === 0 && !creating && !orderId) {
+      navigate('/cart');
+    }
+  }, [items.length, creating, orderId, navigate]);
+  useEffect(() => { mountedRef.current = true; }, []);
+
+  if (authLoading || (!user && !authLoading)) {
+    return (
+      <section className="py-10" aria-labelledby="checkout-heading" {...(authLoading ? { 'aria-busy': true } as any : {})}>
+        <h1 id="checkout-heading" className="text-xl font-semibold mb-4">Checkout</h1>
+        <p className="text-sm text-gray-600">Loading account...</p>
+      </section>
+    );
+  }
+
   return (
-    <section className="grid gap-6 md:grid-cols-2">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-        <h1 className="text-xl font-semibold">Checkout</h1>
+    <section className="grid gap-6 md:grid-cols-2" aria-labelledby="checkout-heading">
+  <form
+    onSubmit={handleSubmit(onSubmit)}
+    className="space-y-3"
+    {...(creating ? { 'aria-busy': true } as any : {})}
+  >
+        {/* Live region for submit status (screen reader only) */}
+        <p className="sr-only" aria-live="polite" role="status">
+          {creating ? 'Submitting order…' : 'Form ready'}
+        </p>
+        <h1 id="checkout-heading" className="text-xl font-semibold">Checkout</h1>
         {error && <p className="text-red-600 text-sm">{error}</p>}
+        {previewBreakdown && previewBreakdown.subtotal < MIN_ORDER && (
+          <p className="text-xs text-amber-600">Add THB {MIN_ORDER - previewBreakdown.subtotal} more to reach the minimum order.</p>
+        )}
+        {previewBreakdown && previewBreakdown.freeDeliveryThreshold && previewBreakdown.subtotal < previewBreakdown.freeDeliveryThreshold && deliveryMethod === 'delivery' && (
+          <p className="text-xs text-emerald-600">Spend THB {previewBreakdown.freeDeliveryThreshold - previewBreakdown.subtotal} more for free delivery.</p>
+        )}
         <input className="border rounded p-2 w-full" placeholder="Name" {...register('name')} />
         {errors.name && <p className="text-red-600 text-sm">Name is required</p>}
   <input className="border rounded p-2 w-full" placeholder="Phone" type="tel" {...register('phone')} />
@@ -234,17 +311,32 @@ export default function CheckoutPage() {
             <p className="text-xs text-gray-500">Use Omise test card: 4242 4242 4242 4242, any future date, any CVC</p>
           </div>
         )}
-        <div className="flex items-center gap-3">
-          <button className="btn-primary" type="submit" disabled={creating || isCartEmpty}>
-            {creating ? 'Placing order…' : 'Place order'}
-          </button>
-          <span className="text-sm text-gray-600">Total: THB {amount}</span>
+        <div className="space-y-2" aria-live="polite">
+          {effectiveBreakdown && (
+            <div className="text-sm bg-slate-50 rounded p-3 space-y-1 border">
+              <div className="flex justify-between"><span>Subtotal</span><span>THB {effectiveBreakdown.subtotal}</span></div>
+              <div className="flex justify-between"><span>Delivery</span><span>THB {effectiveBreakdown.deliveryFee}</span></div>
+              <div className="flex justify-between"><span>Tax</span><span>THB {effectiveBreakdown.tax}</span></div>
+              {effectiveBreakdown.discount ? <div className="flex justify-between text-emerald-600"><span>Discount</span><span>- THB {effectiveBreakdown.discount}</span></div> : null}
+              <div className="flex justify-between font-semibold border-t pt-1"><span>Total</span><span>THB {effectiveBreakdown.total}</span></div>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <button className="btn-primary" type="submit" disabled={creating || isCartEmpty}>
+              {creating ? 'Placing order…' : 'Place order'}
+            </button>
+            <span className="text-sm text-gray-600">Total: THB {displayTotal}</span>
+          </div>
         </div>
       </form>
 
-      <div className="card p-4">
-        <h2 className="text-lg font-semibold mb-2">PromptPay QR</h2>
-        {qrImageUrl || qrPayload ? (
+      <div className="card p-4" aria-labelledby="payment-heading">
+        <h2 id="payment-heading" className="text-lg font-semibold mb-2">Payment</h2>
+        {breakdown?.expectedReadyAt && (
+          <div className="text-xs text-gray-500 mb-3">Ready about {new Date(breakdown.expectedReadyAt).toLocaleTimeString()} {breakdown.expectedDeliveryAt ? `• ETA delivery ${new Date(breakdown.expectedDeliveryAt).toLocaleTimeString()}` : ''}</div>
+        )}
+        {paymentMethod === 'promptpay' && (
+          qrImageUrl || qrPayload ? (
           <>
             <div className="grid place-items-center py-2">
               {qrImageUrl ? (
@@ -258,7 +350,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 className="btn-outline"
-                onClick={() => navigator.clipboard.writeText(String(amount))}
+                onClick={() => navigator.clipboard.writeText(String(displayTotal))}
               >
                 Copy Amount
               </button>
@@ -281,8 +373,12 @@ export default function CheckoutPage() {
               </button>
             </div>
           </>
-        ) : (
-          <p className="text-sm text-gray-600">Create an order to generate QR code (shown when PromptPay selected).</p>
+          ) : (
+            <p className="text-sm text-gray-600">Create an order to generate QR code (shown when PromptPay selected).</p>
+          )
+        )}
+        {paymentMethod !== 'promptpay' && !orderId && (
+          <p className="text-sm text-gray-600">Select payment method and place order to continue.</p>
         )}
       </div>
     </section>

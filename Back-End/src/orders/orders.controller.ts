@@ -1,5 +1,7 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post, Query, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post, Query, UseGuards, Req, Patch, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { OrdersService } from './orders.service';
+import { OrdersEvents } from './orders.events';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Request } from 'express';
@@ -7,7 +9,7 @@ import { auth } from '../auth/auth.service';
 
 @Controller('api/orders')
 export class OrdersController {
-  constructor(@Inject(OrdersService) private readonly orders: OrdersService) {
+  constructor(@Inject(OrdersService) private readonly orders: OrdersService, @Inject(OrdersEvents) private readonly events: OrdersEvents) {
     // eslint-disable-next-line no-console
     console.log('[orders.controller] constructed; orders injected =', !!this.orders);
   }
@@ -18,21 +20,23 @@ export class OrdersController {
     return this.orders.listByPhone(phone);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() dto: CreateOrderDto, @Req() req: Request) {
-    // eslint-disable-next-line no-console
-    console.log('[orders.controller] create called; has service =', !!this.orders);
+    console.log('[orders.controller] create (auth required) called; user =', (req as any).user?.id);
     try {
-  // Best-effort get user from token (optional)
-  const bearer = (req.headers['authorization'] as string | undefined)?.replace(/^Bearer\s+/i, '');
-  const token = bearer || (req as any).cookies?.access_token;
-  const payload = token ? auth.verify(token) : null;
-  const userId = (payload as any)?.id as string | undefined;
-  const order = await this.orders.create(dto, userId);
+      const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
+      const order = await this.orders.create(dto, userId);
       return {
         orderId: order?.id,
         status: order?.status,
         amountTotal: order?.total,
+        tax: order?.tax,
+        deliveryFee: order?.deliveryFee,
+        subtotal: order?.subtotal,
+        discount: order?.discount,
+        expectedReadyAt: (order as any)?.expectedReadyAt,
+        expectedDeliveryAt: (order as any)?.expectedDeliveryAt,
         payment: order?.payment && {
           type: order.payment.method,
           qrPayload: order.payment.promptpayQR,
@@ -80,5 +84,25 @@ export class OrdersController {
   @Post(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.orders.cancel(id);
+  }
+
+  @Post(':id/confirm-delivered')
+  confirmDelivered(@Param('id') id: string) {
+    return this.orders.confirmDelivered(id);
+  }
+
+  @Get(':id/eta')
+  eta(@Param('id') id: string) {
+    return this.orders.eta(id);
+  }
+
+  @Get(':id/stream')
+  stream(@Param('id') id: string, @Res() res: Response) {
+    this.events.subscribe(id, res);
+  }
+
+  @Patch(':id/status')
+  updateStatus(@Param('id') id: string, @Body() body: { status: string; driverName?: string }) {
+    return this.orders.updateStatus(id, body.status, body.driverName);
   }
 }

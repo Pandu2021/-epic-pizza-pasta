@@ -3,11 +3,17 @@ import { Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildPromptPayPayload } from '../utils/promptpay';
 import { prisma } from '../prisma';
-import { appendOrderToSheet, updateOrderStatusInSheet } from '../utils/sheets';
+import { appendOrderToSheet, updateOrderStatusInSheet, appendOrderItemsToPrintSheet, updatePrintSheetStatus } from '../utils/sheets';
 import { enqueue } from '../utils/job-queue';
+import { computePricing, formatEta } from '../utils/pricing';
+import { sendOrderEmail } from '../utils/email';
+import { OrdersEvents } from './orders.events';
 
 @Injectable()
 export class OrdersService {
+  constructor(private readonly events?: OrdersEvents) {}
+  // In-memory guard to avoid duplicate Google Sheets appends per order id (process lifetime)
+  private appendedOrderIds = new Set<string>();
   async listByPhone(phone: string) {
     return prisma.order.findMany({ where: { phone }, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
   }
@@ -22,11 +28,13 @@ export class OrdersService {
     return prisma.order.findMany({ where, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
   }
   async create(dto: CreateOrderDto, userId?: string) {
-    const subtotal = dto.items.reduce((sum, it) => sum + it.price * it.qty, 0);
-    const deliveryFee = dto.delivery.fee ?? 0;
-    const tax = 0;
-    const discount = 0;
-    const total = subtotal + deliveryFee + tax - discount;
+    const pricing = computePricing({
+      items: dto.items.map(i => ({ price: i.price, qty: i.qty })),
+      distanceKm: dto.delivery?.distanceKm,
+      deliveryType: dto.delivery?.type || 'delivery',
+      providedDeliveryFee: dto.delivery?.fee,
+    });
+    const { subtotal, deliveryFee, tax, discount, total, expectedReadyAt, expectedDeliveryAt } = pricing;
 
     // Simple non-transactional flow (safe for our simple create semantics)
     // Debug: log minimal shape
@@ -52,10 +60,11 @@ export class OrdersService {
     let created;
     try {
       // If userId not provided but phone matches a user, resolve it
-      let resolvedUserId: string | undefined = userId;
+      let resolvedUserId: string | undefined = userId ?? undefined;
       if (!resolvedUserId && dto.customer.phone) {
         const u = await prisma.user.findFirst({ where: { phone: dto.customer.phone } });
-        resolvedUserId = u?.id;
+        // coalesce potential null to undefined to satisfy Prisma's UserWhereUniqueInput
+        resolvedUserId = (u?.id ?? undefined) as string | undefined;
       }
 
       created = await prisma.order.create({
@@ -73,8 +82,11 @@ export class OrdersService {
           paymentMethod: dto.paymentMethod,
           deliveryType: dto.delivery.type,
           distanceKm: dto.delivery.distanceKm,
+          // Cast new fields until prisma migrate updates generated types
+          expectedReadyAt: expectedReadyAt as any,
+          expectedDeliveryAt: expectedDeliveryAt as any,
           ...(resolvedUserId ? { User: { connect: { id: resolvedUserId } } } : {}),
-        },
+        } as any,
       });
     } catch (err: unknown) {
       // eslint-disable-next-line no-console
@@ -160,16 +172,11 @@ export class OrdersService {
       }
     }
 
-    return this.get(created.id);
-  }
+    const order = await this.get(created.id);
 
-  async get(id: string) {
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: { items: true, payment: true },
-    });
-    // Enqueue Google Sheets append (non-blocking) with retry & DB log
-    if (order && process.env.GOOGLE_SHEET_ID) {
+    // Enqueue Google Sheets append ONCE (idempotent via Set) right after create
+    if (order && process.env.GOOGLE_SHEET_ID && !this.appendedOrderIds.has(order.id)) {
+      this.appendedOrderIds.add(order.id);
       const payload = {
         id: order.id,
         customerName: order.customerName,
@@ -187,11 +194,12 @@ export class OrdersService {
         items: order.items?.map((it) => ({ nameSnapshot: it.nameSnapshot, qty: it.qty, priceSnapshot: it.priceSnapshot })),
         payment: { status: order.payment?.status },
       } as const;
-
       enqueue({
         id: `sheets:${order.id}`,
         run: async () => {
           const ok = await appendOrderToSheet(payload);
+          // Best-effort append to print sheet (kitchen ticket rows) if enabled
+          try { await appendOrderItemsToPrintSheet(payload); } catch (e) { /* non-fatal */ }
           await prisma.webhookEvent.create({
             data: {
               type: ok ? 'sheets.append.success' : 'sheets.append.failure',
@@ -204,16 +212,51 @@ export class OrdersService {
         baseDelayMs: 1500,
       });
     }
+    try { this.events?.emit(created.id, 'order.created', { id: created.id, status: order?.status }); } catch {}
+    // Fire-and-forget email notification if user email can be resolved
+    if (order?.userId) {
+      enqueue({
+        id: `email:order-created:${order.id}`,
+        run: async () => {
+          const userIdLookup = order.userId ?? undefined;
+          const user = userIdLookup ? await prisma.user.findUnique({ where: { id: userIdLookup } }) : null;
+          if (user?.email) {
+            await sendOrderEmail({ id: order.id, to: user.email, customerName: order.customerName, total: order.total, status: order.status });
+          }
+        },
+        maxRetries: 3,
+        baseDelayMs: 1000,
+      });
+    }
     return order;
+  }
+
+  async get(id: string) {
+    return prisma.order.findUnique({
+      where: { id },
+      include: { items: true, payment: true },
+    });
   }
 
   async cancel(id: string) {
     const order = await prisma.order.update({ where: { id }, data: { status: 'cancelled' } });
+    // Attempt refund if payment exists and is pending/unpaid
+    try {
+      const payment = await prisma.payment.findUnique({ where: { orderId: id } });
+      if (payment && ['pending','unpaid'].includes(payment.status)) {
+        await prisma.payment.update({ where: { orderId: id }, data: { status: 'refunded', paidAt: null as any } });
+        await prisma.webhookEvent.create({ data: { type: 'payment.refund.simulated', payload: { orderId: id } as any } });
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[orders.cancel] refund attempt failed (non-fatal)', e);
+    }
     if (order && process.env.GOOGLE_SHEET_ID) {
       enqueue({
         id: `sheets:update-status:${order.id}`,
         run: async () => {
           const ok = await updateOrderStatusInSheet(order.id, 'cancelled');
+          try { await updatePrintSheetStatus(order.id, 'cancelled'); } catch {}
           await prisma.webhookEvent.create({
             data: {
               type: ok ? 'sheets.status.success' : 'sheets.status.failure',
@@ -227,5 +270,57 @@ export class OrdersService {
       });
     }
     return order;
+  }
+  
+  async confirmDelivered(id: string) {
+    const order = await prisma.order.update({ where: { id }, data: { status: 'delivered', deliveredAt: new Date() } as any });
+    try { this.events?.emit(order.id, 'order.status', { status: order.status }); } catch {}
+    return order;
+  }
+
+  async updateStatus(id: string, status: string, driverName?: string) {
+    const allowed = ['received','preparing','out-for-delivery','completed','delivered','cancelled'];
+    if (!allowed.includes(status)) throw new Error('Invalid status');
+    const data: any = { status };
+    if (driverName) data.driverName = driverName;
+    if (status === 'delivered') data.deliveredAt = new Date();
+  const order = await prisma.order.update({ where: { id }, data });
+  try { this.events?.emit(order.id, 'order.status', { status: order.status, driverName: (order as any).driverName }); } catch {}
+    if (process.env.GOOGLE_SHEET_ID) {
+      enqueue({
+        id: `sheets:update-status:${order.id}:${status}`,
+        run: async () => {
+          const ok = await updateOrderStatusInSheet(order.id, status);
+          try { await updatePrintSheetStatus(order.id, status); } catch {}
+          await prisma.webhookEvent.create({
+            data: {
+              type: ok ? 'sheets.status.success' : 'sheets.status.failure',
+              payload: { id: order.id, status } as any,
+            },
+          });
+          if (!ok) throw new Error('updateOrderStatusInSheet failed');
+        },
+        maxRetries: 5,
+        baseDelayMs: 1500,
+      });
+    }
+    return order;
+  }
+
+  async eta(id: string) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) return null;
+    const anyOrder = order as any;
+    const eta = formatEta({
+      subtotal: anyOrder.subtotal,
+      deliveryFee: anyOrder.deliveryFee,
+      discount: anyOrder.discount,
+      tax: anyOrder.tax,
+      total: anyOrder.total,
+      vatRate: Number(process.env.THAI_VAT_RATE || 0.07),
+      expectedReadyAt: anyOrder.expectedReadyAt || new Date(),
+      expectedDeliveryAt: anyOrder.expectedDeliveryAt || undefined,
+    } as any);
+    return { id: order.id, status: order.status, ...eta };
   }
 }

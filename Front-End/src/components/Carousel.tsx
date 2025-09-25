@@ -12,7 +12,7 @@ type Props = {
   auto?: boolean;
   intervalMs?: number;
   className?: string;
-  extra?: ReactNode; // optional overlay (e.g., Login button)
+  extra?: ReactNode; // optional inline extra content (e.g., Contact button)
 };
 
 export default function Carousel({ slides, auto = true, intervalMs = 6000, className = '', extra }: Props) {
@@ -56,13 +56,6 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
       }}
     >
       <div className="relative h-[380px] sm:h-[420px] md:h-[480px]">
-        {extra && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 pointer-events-none">
-            <div className="pointer-events-auto">
-              {extra}
-            </div>
-          </div>
-        )}
         {safeSlides.map((s, i) => (
           <div
             key={i}
@@ -74,9 +67,14 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
             <img src={s.image} alt={s.alt ?? s.title} className="absolute inset-0 h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
             <div className="relative z-10 h-full flex items-center">
-              <div className="p-6 md:p-10 text-white max-w-2xl">
+              <div className="p-6 md:p-10 text-white max-w-2xl backdrop-blur-[1px] bg-black/0 mx-auto text-center">
                 <h3 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight drop-shadow">{s.title}</h3>
-                <p className="mt-3 md:mt-4 text-sm md:text-base text-white/90 leading-relaxed">{s.description}</p>
+                <p className="mt-3 md:mt-4 text-sm md:text-base text-white/90 leading-relaxed max-w-xl mx-auto">{s.description}</p>
+                {extra && i === index && (
+                  <div className="mt-6 md:mt-8 flex justify-center animate-fade-in-up">
+                    {extra}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -86,12 +84,14 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
       {count > 1 && (
         <>
           {/* Controls */}
-          <button type="button" aria-label="Previous slide" className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={prev}>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-black/40 to-transparent z-20" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-black/40 to-transparent z-20" />
+          <button type="button" aria-label="Previous slide" className="absolute left-3 top-1/2 -translate-y-1/2 h-11 w-11 rounded-full grid place-items-center backdrop-blur bg-black/30 hover:bg-black/45 focus:outline-none focus:ring-2 focus:ring-white/80 text-white z-40 transition" onClick={prev}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5">
               <path fillRule="evenodd" d="M15.53 4.47a.75.75 0 010 1.06L9.06 12l6.47 6.47a.75.75 0 11-1.06 1.06l-7-7a.75.75 0 010-1.06l7-7a.75.75 0 011.06 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <button type="button" aria-label="Next slide" className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center backdrop-blur bg-white/10 hover:bg-white/20 text-white" onClick={next}>
+          <button type="button" aria-label="Next slide" className="absolute right-3 top-1/2 -translate-y-1/2 h-11 w-11 rounded-full grid place-items-center backdrop-blur bg-black/30 hover:bg-black/45 focus:outline-none focus:ring-2 focus:ring-white/80 text-white z-40 transition" onClick={next}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5">
               <path fillRule="evenodd" d="M8.47 19.53a.75.75 0 010-1.06L14.94 12 8.47 5.53a.75.75 0 111.06-1.06l7 7a.75.75 0 010 1.06l-7 7a.75.75 0 01-1.06 0z" clipRule="evenodd" />
             </svg>

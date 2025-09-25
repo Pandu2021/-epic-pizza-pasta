@@ -18,18 +18,33 @@ type JsonMenuItem = {
   labels?: string[];
 };
 
-function loadJsonMenu(): JsonMenuItem[] {
-  try {
-    const jsonPath = path.join(__dirname, '../../prisma/seed/menu.json');
-    const raw = fs.readFileSync(jsonPath, 'utf8');
-    const data = JSON.parse(raw) as JsonMenuItem[];
-    return data.map((it) => ({
-      ...it,
-      images: it.images ?? (it.image ? [it.image] : []),
-    }));
-  } catch {
-    return [];
+export function loadJsonMenu(): JsonMenuItem[] {
+  const tried: string[] = [];
+  const candidates = [
+    process.env.MENU_JSON_PATH, // explicit override
+    path.join(__dirname, '../../prisma/seed/menu.json'), // TS runtime (tsx) path
+    path.join(process.cwd(), 'prisma/seed/menu.json'), // root relative (prod build dist path)
+    path.join(process.cwd(), 'dist/prisma/seed/menu.json'), // in case copied into dist
+  ].filter(Boolean) as string[];
+  for (const p of candidates) {
+    try {
+      tried.push(p);
+      if (!fs.existsSync(p)) continue;
+      const raw = fs.readFileSync(p, 'utf8');
+      const data = JSON.parse(raw) as JsonMenuItem[];
+      return data.map((it) => ({
+        ...it,
+        images: it.images ?? (it.image ? [it.image] : []),
+      }));
+    } catch (e) {
+      // continue to next candidate
+    }
   }
+  if (process.env.DEBUG_MENU_LOAD === 'true') {
+    // eslint-disable-next-line no-console
+    console.warn('[menu.loadJsonMenu] failed to load menu JSON. Tried:', tried);
+  }
+  return [];
 }
 
 // Simple in-memory cache for menu responses (process-local)

@@ -8,15 +8,65 @@ import { JwtAuthGuard } from '../common/guards/auth.guard';
 @Controller('api/auth')
 export class AuthController {
   @Post('register')
-  async register(@Body() body: { email: string; password: string; name?: string; phone?: string }) {
+  async register(
+    @Body() body: { email: string; password: string; name?: string; phone?: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Normalize & basic field extraction
     const email = (body.email || '').trim().toLowerCase();
-    if ((body.password || '').length < 8 || !/[A-Za-z]/.test(body.password) || !/\d/.test(body.password)) {
+    const password = body.password || '';
+    const name = (body.name || '').trim() || null;
+    const phoneRaw = (body.phone || '').trim();
+
+    // Validation: email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+    if (!email || !emailRegex.test(email)) {
+      throw new BadRequestException('Invalid email');
+    }
+
+    // Password policy: length >= 8, at least one letter, one number, optional: encourage special char
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
       throw new BadRequestException('Password must be at least 8 characters and include letters and numbers');
     }
-    const passwordHash = await argon2.hash(body.password);
+    // Reject extremely common weak passwords even if they pass the regex
+    const weakList = new Set(['password', 'password1', '12345678', '123456789', 'qwerty123']);
+    if (weakList.has(password.toLowerCase())) {
+      throw new BadRequestException('Password too common');
+    }
+
+    // Phone normalization: keep only digits and plus, basic length check (optional field)
+    let phone: string | null = null;
+    if (phoneRaw) {
+      const digits = phoneRaw.replace(/[^+\d]/g, '');
+      if (digits.length < 7 || digits.length > 20) {
+        throw new BadRequestException('Invalid phone number');
+      }
+      phone = digits;
+    }
+
+    const passwordHash = await argon2.hash(password);
     try {
-      const user = await prisma.user.create({ data: { email, passwordHash, name: body.name, phone: body.phone } });
-      return { id: user.id, email: user.email, name: user.name, phone: user.phone };
+      const user = await prisma.user.create({ data: { email, passwordHash, name, phone } });
+
+      // Auto-login (issue tokens) for smoother UX; same cookie options as login
+      const payload = { id: user.id, email: user.email, role: user.role };
+      const access = auth.signAccess(payload);
+      const refresh = auth.signRefresh(payload);
+      const cookieOpts = {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      };
+      res.cookie('access_token', access, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+      res.cookie('refresh_token', refresh, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+      // Backward compatibility: include id at top-level; new shape under user + ok flag
+      return {
+        ok: true,
+        id: user.id,
+        user: { id: user.id, email: user.email, name: user.name ?? undefined, phone: user.phone ?? undefined, role: user.role },
+      };
     } catch (e: any) {
       if (e?.code === 'P2002') {
         throw new ConflictException('Email already in use');

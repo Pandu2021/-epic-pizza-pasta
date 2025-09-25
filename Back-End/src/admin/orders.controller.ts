@@ -22,7 +22,10 @@ export class AdminOrdersController {
 
   @Patch(':id/status')
   async setStatus(@Param('id') id: string, @Body() body: AdminOrderStatusDto) {
-    const updated = await prisma.order.update({ where: { id }, data: { status: body.status } });
+    const data: any = { status: body.status };
+    if ((body as any).driverName) data.driverName = (body as any).driverName;
+    if (body.status === 'delivered') data.deliveredAt = new Date();
+    const updated = await prisma.order.update({ where: { id }, data });
     if (process.env.GOOGLE_SHEET_ID) {
       enqueue({
         id: `sheets:admin-status:${id}`,
@@ -38,5 +41,22 @@ export class AdminOrdersController {
       });
     }
     return updated;
+  }
+
+  @Get('metrics/summary')
+  async metrics() {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [ordersToday, revenueAgg, pendingPayments] = await Promise.all([
+      prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
+      prisma.order.aggregate({ _sum: { total: true }, where: { createdAt: { gte: startOfDay } } }),
+      prisma.payment.count({ where: { status: { in: ['pending','unpaid'] } } }),
+    ]);
+    return {
+      ts: now.toISOString(),
+      ordersToday,
+      revenueToday: revenueAgg._sum.total || 0,
+      unpaidOrPendingPayments: pendingPayments,
+    };
   }
 }

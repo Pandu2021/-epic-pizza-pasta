@@ -1,6 +1,6 @@
 ## Epic Pizza & Pasta — Project Summary
 
-Last updated: 2025-09-19
+Last updated: 2025-09-24
 
 This document is a complete English summary of the project materials, decisions, milestones, technical notes, and next steps for the "Epic Pizza and Pasta" online ordering website. Keep this file as the canonical short-hand guide for development, deployment, and handover.
 
@@ -80,6 +80,10 @@ This document is a complete English summary of the project materials, decisions,
 
 - Delivery fee rules
   - Implement tiered fees (example): 0–3 km = 40 THB, 3–6 km = 60 THB, >6 km = 100 THB (adjustable via admin UI).
+  - CURRENT IMPLEMENTATION (code): 0–3 km = 40 THB, >3–6 km = 60 THB, >6–10 km = 80 THB, >10 km = 100 THB (see `Back-End/src/utils/pricing.ts`).
+  - ENV Overrides (future): could externalize to DB or env like DELIVERY_TIERS_JSON.
+  - Dynamic Override Already Supported: set `DELIVERY_TIERS_JSON` as JSON array of objects `{ "maxKm": number, "fee": number }` sorted automatically.
+  - Free Delivery Threshold: set `FREE_DELIVERY_MIN` (subtotal >= threshold makes deliveryFee = 0).
 
 - Gmail notifications
   - Use Gmail API with OAuth credentials or send via SMTP with an app password (prefer Gmail API for reliability). Email should include full order details and printer/receipt reference.
@@ -133,6 +137,54 @@ Store secrets in an environment file on the server (never commit to Git). Exampl
 - GMAIL_OAUTH_CLIENT_ID=...
 - GMAIL_OAUTH_CLIENT_SECRET=...
 - GMAIL_OAUTH_REFRESH_TOKEN=...
+- THAI_VAT_RATE=0.07 (default 7%)
+- ORDER_COOK_MINUTES=15 (base prep time)
+- ORDER_COOK_PER_ITEM_MIN=2 (additional per line item)
+- DELIVERY_SPEED_KMPH=30 (for ETA calculations)
+- DELIVERY_TIERS_JSON=[{"maxKm":3,"fee":40},{"maxKm":6,"fee":60},{"maxKm":10,"fee":80},{"maxKm":9999,"fee":100}]
+- FREE_DELIVERY_MIN=500
+
+## 14 Real-Time Order Updates (SSE)
+
+- Endpoint: `GET /api/orders/{orderId}/stream` returns Server-Sent Events.
+- Events Emitted:
+  - `order.created` { id, status }
+  - `order.status` { status, driverName? }
+- Frontend example implemented in `Front-End/src/pages/OrderConfirmationPage.tsx`.
+
+## 15 Admin Metrics & Driver Assignment
+
+- New endpoint: `GET /api/admin/orders/metrics/summary` (admin auth required)
+  - Returns: `{ ts, ordersToday, revenueToday, unpaidOrPendingPayments }`
+- Driver assignment: Admin status update (`PATCH /api/admin/orders/:id/status`) accepts optional `driverName` and sets `deliveredAt` timestamp when status = `delivered`.
+
+## 16 Email Notification Stub
+
+- Lightweight stub `sendOrderEmail` in `Back-End/src/utils/email.ts`.
+- Invoked asynchronously (job queue) after order creation when a user email exists.
+- Replace stub with real provider (Gmail API / SMTP / Resend) in production.
+
+## 17 Delivery Tracking Simulation (Frontend)
+
+- Animated “pizza car” progress bar on order confirmation page.
+- Progress is linear from `orderedAt` to `expectedDeliveryAt`.
+- Auto-confirm: if customer does not press "Pesanan diterima" within 5 minutes after expected delivery, system auto-marks delivered.
+- Env (frontend): `VITE_RESTAURANT_LAT`, `VITE_RESTAURANT_LNG` (future use for map path length scaling).
+
+## 18 Refund & Cancellation Flow (Simulation)
+
+- A lightweight refund simulation is implemented for cancellations while payment is still in a non-final state (e.g. pending / unpaid / COD not yet fulfilled).
+- Logic: `shouldRefund` utility decides if an order qualifies based on payment method + status. Current rule: only pending/unpaid states are auto-marked refunded on cancel; already paid (captured) card payments would require a real gateway refund (NOT yet implemented).
+- Service: `OrdersService.cancel` sets payment status to `refunded` (simulated) and emits an internal webhook/log event for observability.
+- Future: Integrate real refund with Omise (create refund by charge ID) then persist gateway refund ID and status for reconciliation.
+- Audit: Event log (webhook util) provides a chronological record for future accounting integration.
+
+## 19 Profile Page Active Order Tracking
+
+- The Profile page now surfaces the most recent in-flight order (any order not in delivered/cancelled state) at the top of Order History.
+- Features: live status via SSE, animated progress bar (same logic as confirmation page), manual Confirm / Cancel buttons, auto-confirm after grace period if user does not interact.
+- Reuses utilities: `computeProgress` + `shouldAutoConfirm` from `tracking.ts`.
+- Benefits: Users returning to their account can monitor delivery without opening the separate confirmation page.
 
 ## 11 Testing & Acceptance Criteria
 

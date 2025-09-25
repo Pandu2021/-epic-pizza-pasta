@@ -80,9 +80,14 @@ model Order {
   status        String      @default("received")
   deliveryType  String      @default("delivery")
   distanceKm    Float?
+  expectedReadyAt     DateTime?
+  expectedDeliveryAt  DateTime?
+  deliveredAt         DateTime?
+  driverName          String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   User          User?       @relation(fields: [userId], references: [id])
+  @@index([status])
 }
 
 model WebhookEvent {

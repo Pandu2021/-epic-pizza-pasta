@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { menuImg } from '../utils/assets';
 import { useCart } from '../store/cartStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
@@ -141,6 +141,19 @@ export default function HomePage() {
               alt: it.title,
             }));
           })()}
+          extra={( 
+            <div className="flex flex-col items-center gap-6">
+              <Link
+                to="/contact"
+                className="px-7 py-3.5 rounded-full font-semibold shadow-lg transition focus:outline-none focus:ring-2 focus:ring-offset-2
+                  bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-500 focus:ring-offset-slate-900/40
+                  dark:focus:ring-offset-slate-900
+                "
+              >
+                {t('contact', 'Contact')}
+              </Link>
+            </div>
+          )}
         />
       </section>
     </div>

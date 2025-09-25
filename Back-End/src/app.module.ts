@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { HealthController } from './health/health.controller';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
+import { OrdersEvents } from './orders/orders.events';
 import { PaymentsController } from './payments/payments.controller';
 import { MenuController } from './menu/menu.controller';
 import { AdminMenuController } from './admin/menu.controller';
@@ -28,6 +29,6 @@ import { AuthController } from './auth/auth.controller';
     EstimateController,
     AuthController,
   ],
-  providers: [OrdersService],
+  providers: [OrdersService, OrdersEvents],
 })
 export class AppModule {}
