@@ -14,6 +14,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/.env ./.env
+# SECURITY: Never copy .env file to Docker image! 
+# Environment variables should be passed at runtime via docker run -e or docker-compose
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

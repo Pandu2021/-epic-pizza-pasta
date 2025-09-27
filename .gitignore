@@ -128,3 +128,55 @@ omise-config.*
 # Local test files
 test-local.*
 *.local.test.*
+
+# Printer configuration files (potentially sensitive network info)
+printer-config.*
+printers.json
+printer-settings.*
+print-config.*
+*.printer.json
+printer-hosts.*
+
+# Docker and deployment files with sensitive info
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.prod.yml
+.dockerignore.local
+
+# Build artifacts and compiled files (may contain secrets)
+dist/
+build/
+.next/
+out/
+
+# Test files with potentially real credentials  
+*test-omise*.mjs
+*test-payment*.mjs
+test-credentials.*
+*.test.local.*
+
+# Generated keys and certificates
+generated-keys/
+ssl-certs/
+*.pem.local
+*.key.local
+
+# Backup and temporary deployment files
+*.backup
+*.bak.env
+deploy-*.json
+deployment-config.*
+
+# Environment-specific files
+.env.staging
+.env.production
+.env.test
+config.staging.*
+config.production.*
+
+# IDE and editor files with project-specific settings
+.vscode/settings.json
+.idea/workspace.xml
+.idea/modules.xml
+*.swp
+*.swo
