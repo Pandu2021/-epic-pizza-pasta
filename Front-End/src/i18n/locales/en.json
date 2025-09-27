@@ -144,4 +144,49 @@
     "with": "With",
     "notes_prefix": "Notes"
   }
+  ,
+  "cart_page": {
+    "title": "Cart",
+    "empty": "Your cart is empty.",
+    "browse_menu": "Browse Menu",
+    "back_to_profile": "Back to Profile",
+    "table": { "item": "Item", "price": "Price", "qty": "Quantity", "total": "Total" },
+    "clear": "Clear Cart",
+    "summary": "Summary",
+    "items": "Items",
+    "subtotal": "Subtotal",
+    "delivery_vat_hint": "Delivery & VAT will be calculated at checkout.",
+    "proceed_checkout": "Proceed to Checkout",
+    "continue_shopping": "Continue Shopping",
+    "aria": {
+      "dec_qty": "Decrease quantity of {{name}}",
+      "inc_qty": "Increase quantity of {{name}}",
+      "qty_of": "Quantity of {{name}}",
+      "remove": "Remove {{name}}"
+    }
+  },
+  "orders": {
+    "title": "My Orders",
+    "subtitle": "Your order history will appear here."
+  },
+  "payment_failed": {
+    "title": "Payment Failed",
+    "message_fallback": "Payment failed. Please try again.",
+    "order_id": "Order ID:",
+    "back_to_checkout": "Back to Checkout",
+    "continue_shopping": "Continue Shopping"
+  },
+  "register": {
+    "title": "Create account",
+    "subtitle": "Sign up to track orders and save your favorites.",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Create account",
+    "submitting": "Creating account...",
+    "error_failed": "Register failed",
+    "error_email_in_use": "Email already in use",
+    "have_account": "Already have an account?",
+    "login": "Login"
+  }
 }

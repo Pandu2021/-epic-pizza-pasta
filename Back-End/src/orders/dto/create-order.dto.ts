@@ -31,7 +31,7 @@ export class CustomerDto {
   @IsNotEmpty()
   @Transform(({ value }) => (typeof value === 'string' ? value.replace(/[\s-]/g, '') : value))
   @Matches(/^(\+66\d{8,9}|0\d{9})$/)
-  phone!: string; // Accepts 0XXXXXXXXX or +66XXXXXXXXX
+  phone!: string; // Accepts 0XXXXXXXXX or +66XXXXXXXX/XXXXXXXXX (cleaned of spaces/dashes); stored normalized to +66 at service layer
 
   @IsString()
   @IsNotEmpty()

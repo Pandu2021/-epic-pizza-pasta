@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { useTranslation } from 'react-i18next';
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,12 +24,12 @@ export default function RegisterPage() {
         try { await api.post('/auth/login', { email: payload.email, password }); } catch {}
         navigate('/profile', { replace: true });
       } else {
-        setError('Register failed');
+        setError(t('register.error_failed'));
       }
     } catch (e: any) {
       const msg = e?.response?.status === 409
-        ? 'Email already in use'
-        : (e?.response?.data?.message || 'Register failed');
+        ? t('register.error_email_in_use')
+        : (e?.response?.data?.message || t('register.error_failed'));
       setError(msg);
     } finally {
       setLoading(false);
@@ -36,26 +38,26 @@ export default function RegisterPage() {
 
   return (
     <section className="max-w-md mx-auto">
-      <h1 className="text-2xl font-bold">Create account</h1>
-      <p className="text-slate-600 mt-1">Sign up to track orders and save your favorites.</p>
+      <h1 className="text-2xl font-bold">{t('register.title')}</h1>
+      <p className="text-slate-600 mt-1">{t('register.subtitle')}</p>
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
         <div>
-          <label className="text-sm" htmlFor="name">Name</label>
+          <label className="text-sm" htmlFor="name">{t('register.name')}</label>
           <input id="name" className="input w-full mt-1" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div>
-          <label className="text-sm" htmlFor="email">Email</label>
+          <label className="text-sm" htmlFor="email">{t('register.email')}</label>
           <input id="email" className="input w-full mt-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div>
-          <label className="text-sm" htmlFor="password">Password</label>
+          <label className="text-sm" htmlFor="password">{t('register.password')}</label>
           <input id="password" className="input w-full mt-1" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <button className="btn-primary w-full" disabled={loading} type="submit">{loading ? 'Creating account...' : 'Create account'}</button>
+        <button className="btn-primary w-full" disabled={loading} type="submit">{loading ? t('register.submitting') : t('register.submit')}</button>
       </form>
       <div className="mt-4 text-sm text-slate-600">
-        Already have an account? <Link to="/login" className="text-primary underline">Login</Link>
+        {t('register.have_account')} <Link to="/login" className="text-primary underline">{t('register.login')}</Link>
       </div>
     </section>
   );

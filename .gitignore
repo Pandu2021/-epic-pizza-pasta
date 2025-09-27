@@ -100,3 +100,31 @@ Back-End/prisma/.env
 *.orig
 *.tmp
 ~*
+
+# API keys and configuration files
+config.json
+config.local.json
+secrets.json
+*.secret.json
+
+# Database connection files
+.database
+database.json
+db.json
+
+# JWT keys and authentication files
+jwt-*.key
+auth-keys/
+private-key*
+public-key*
+
+# Payment gateway configuration
+payment-config.*
+omise-config.*
+
+# Prisma studio
+.prisma-studio/
+
+# Local test files
+test-local.*
+*.local.test.*

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCart } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function CartPage() {
+  const { t } = useTranslation();
   const focusRef = useRef<HTMLHeadingElement | null>(null);
   const { items, updateQty, removeItem, clear, total, count } = useCart();
   const navigate = useNavigate();
@@ -19,15 +21,15 @@ export default function CartPage() {
         tabIndex={-1}
         className="text-2xl font-bold mb-6 focus:outline-none tracking-tight"
       >
-        Cart
+        {t('cart_page.title')}
       </h1>
 
       {items.length === 0 && (
         <div className="rounded-lg border border-dashed border-slate-300 p-10 text-center">
-          <p className="text-slate-600">Your cart is empty.</p>
+          <p className="text-slate-600">{t('cart_page.empty')}</p>
           <div className="mt-4 flex justify-center gap-3">
-            <Link to="/menu" className="btn-primary">Browse Menu</Link>
-            <Link to="/profile" className="btn-outline">Back to Profile</Link>
+            <Link to="/menu" className="btn-primary">{t('cart_page.browse_menu')}</Link>
+            <Link to="/profile" className="btn-outline">{t('cart_page.back_to_profile')}</Link>
           </div>
         </div>
       )}
@@ -38,10 +40,10 @@ export default function CartPage() {
             <table className="w-full text-sm align-middle">
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-200">
-                  <th className="py-2 pr-2 font-medium">Item</th>
-                  <th className="py-2 px-2 font-medium w-28 text-center">Price</th>
-                  <th className="py-2 px-2 font-medium w-32 text-center">Quantity</th>
-                  <th className="py-2 px-2 font-medium w-28 text-right">Total</th>
+                  <th className="py-2 pr-2 font-medium">{t('cart_page.table.item')}</th>
+                  <th className="py-2 px-2 font-medium w-28 text-center">{t('cart_page.table.price')}</th>
+                  <th className="py-2 px-2 font-medium w-32 text-center">{t('cart_page.table.qty')}</th>
+                  <th className="py-2 px-2 font-medium w-28 text-right">{t('cart_page.table.total')}</th>
                   <th className="py-2 pl-2 w-10" aria-label="Remove" />
                 </tr>
               </thead>
@@ -71,7 +73,7 @@ export default function CartPage() {
                             onClick={() => updateQty(it.id, it.qty - 1)}
                             className="h-7 w-7 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold disabled:opacity-40"
                             disabled={it.qty <= 1}
-                            aria-label={`Decrease quantity of ${it.name}`}
+                            aria-label={t('cart_page.aria.dec_qty', { name: it.name })}
                           >-
                           </button>
                           <input
@@ -82,14 +84,14 @@ export default function CartPage() {
                               updateQty(it.id, val);
                             }}
                             className="w-12 text-center border border-slate-300 rounded h-7 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                            aria-label={`Quantity of ${it.name}`}
+                            aria-label={t('cart_page.aria.qty_of', { name: it.name })}
                             min={1}
                           />
                           <button
                             type="button"
                             onClick={() => updateQty(it.id, it.qty + 1)}
                             className="h-7 w-7 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold"
-                            aria-label={`Increase quantity of ${it.name}`}
+                            aria-label={t('cart_page.aria.inc_qty', { name: it.name })}
                           >+
                           </button>
                         </div>
@@ -100,7 +102,7 @@ export default function CartPage() {
                           type="button"
                           onClick={() => removeItem(it.id)}
                           className="text-slate-400 hover:text-red-500 transition"
-                          aria-label={`Remove ${it.name}`}
+                          aria-label={t('cart_page.aria.remove', { name: it.name })}
                         >
                           ✕
                         </button>
@@ -119,28 +121,28 @@ export default function CartPage() {
                 onClick={() => clear()}
                 className="btn-outline text-sm"
               >
-                Clear Cart
+                {t('cart_page.clear')}
               </button>
             </div>
             <div className="md:w-1/3 ml-auto rounded-lg border border-slate-200 p-5 bg-white shadow-sm space-y-4">
-              <h2 className="font-semibold text-slate-700">Summary</h2>
+              <h2 className="font-semibold text-slate-700">{t('cart_page.summary')}</h2>
               <div className="flex justify-between text-sm text-slate-600">
-                <span>Items</span>
+                <span>{t('cart_page.items')}</span>
                 <span>{itemCount}</span>
               </div>
               <div className="flex justify-between text-sm text-slate-600">
-                <span>Subtotal</span>
+                <span>{t('cart_page.subtotal')}</span>
                 <span className="font-medium text-slate-800">THB {subtotal.toFixed(0)}</span>
               </div>
-              <p className="text-[11px] text-slate-500">Delivery & VAT will be calculated at checkout.</p>
+              <p className="text-[11px] text-slate-500">{t('cart_page.delivery_vat_hint')}</p>
               <button
                 type="button"
                 className="btn-primary w-full"
                 onClick={() => navigate('/checkout')}
               >
-                Proceed to Checkout
+                {t('cart_page.proceed_checkout')}
               </button>
-              <Link to="/menu" className="btn-outline w-full text-center">Continue Shopping</Link>
+              <Link to="/menu" className="btn-outline w-full text-center">{t('cart_page.continue_shopping')}</Link>
             </div>
           </div>
         </div>

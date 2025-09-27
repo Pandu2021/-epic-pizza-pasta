@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "baseUrl": ".",
     "strict": true,
     "esModuleInterop": true,
@@ -13,8 +13,12 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "sourceMap": true,
-  "types": ["node"]
+  "types": ["node"],
+  "typeRoots": [
+    "./types",
+    "./node_modules/@types"
+  ]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "prisma/seed/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,4 +1,4 @@
-import { UserCircleIcon, Cog6ToothIcon, GlobeAltIcon, ArrowRightOnRectangleIcon, FunnelIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { UserCircleIcon, Cog6ToothIcon, GlobeAltIcon, ArrowRightOnRectangleIcon, FunnelIcon, ArrowPathIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../store/cartStore';
@@ -401,7 +401,7 @@ const ProfilePage = () => {
                       const statusColor = status.includes('cancel') ? 'bg-red-100 text-red-700' : status.includes('deliver') ? 'bg-green-100 text-green-700' : status.includes('prepar') ? 'bg-amber-100 text-amber-700' : status.includes('complete') ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700';
                       const methodColor = method === 'promptpay' ? 'bg-indigo-100 text-indigo-700' : method === 'card' ? 'bg-violet-100 text-violet-700' : method === 'cod' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700';
                       return (
-                        <Link key={o.id} to={`/order-confirmation?orderId=${o.id}`} className="block p-4 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                        <div key={o.id} className="p-4 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
                           <div className="flex flex-wrap justify-between gap-3">
                             <div className="space-y-1">
                               <div className="text-xs font-mono text-slate-500">#{o.id.slice(0, 10)}</div>
@@ -416,7 +416,12 @@ const ProfilePage = () => {
                               <div className="font-semibold tracking-tight">THB {o.total}</div>
                             </div>
                           </div>
-                        </Link>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Link to={`/order-confirmation?orderId=${o.id}`} className="btn-outline text-xs">View</Link>
+                            <PrintButton orderId={o.id} />
+                            <DownloadButton orderId={o.id} />
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -510,6 +515,77 @@ const ProfilePage = () => {
         </div>
       </section>
     </motion.div>
+  );
+};
+
+const PrintButton = ({ orderId }: { orderId: string }) => {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [ok, setOk] = useState<null | boolean>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const onClick = async () => {
+    setLoading(true);
+    setErr(null);
+    setOk(null);
+    try {
+      await endpoints.reprint(orderId);
+      setOk(true);
+      // brief success indicator
+      setTimeout(() => setOk(null), 2000);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e?.message || 'Failed to print');
+      // auto clear after a while
+      setTimeout(() => setErr(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <div className="inline-flex items-center gap-2">
+      <button type="button" className={`btn-outline text-xs inline-flex items-center gap-1 ${loading ? 'opacity-70' : ''}`} onClick={onClick} disabled={loading}>
+        {loading ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <PrinterIcon className="h-4 w-4" />}
+        <span>{ok ? t('profile.printed', 'Printed') : t('profile.print', 'Print')}</span>
+      </button>
+      {err && <span className="text-xs text-red-600">{err}</span>}
+    </div>
+  );
+};
+
+const DownloadButton = ({ orderId }: { orderId: string }) => {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const onClick = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await api.get(`/orders/${orderId}/receipt.pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Try read filename from content-disposition
+      const cd = (res.headers?.['content-disposition'] || res.headers?.['Content-Disposition'] || '') as string;
+      const m = cd.match(/filename="?([^";]+)"?/i);
+      a.download = m?.[1] || `receipt-${orderId.slice(0,8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e?.message || 'Failed to download');
+      setTimeout(() => setErr(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <div className="inline-flex items-center gap-2">
+      <button type="button" className={`btn-outline text-xs ${loading ? 'opacity-70' : ''}`} onClick={onClick} disabled={loading}>
+        {loading ? t('profile.downloading', 'Downloading...') : t('profile.download', 'Download')}
+      </button>
+      {err && <span className="text-xs text-red-600">{err}</span>}
+    </div>
   );
 };
 

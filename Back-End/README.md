@@ -8,12 +8,58 @@ Last updated: 2025-09-19
 
 - Quick start
 - Scripts
-- Security
-- Environment variables
-- Architecture
-- Testing
-- API highlights
-- Deployment
+- `print:test` – sends a simple text test page to a network printer via RAW 9100
+- `print:probe` – checks if ports 9100/631/515 are reachable
+- `print:list` – lists printers recognized by the OS (Windows)
+- `print:pdf` – generates a small PDF and sends it to the default or named printer (Windows)
+
+### Printing (RAW 9100)
+
+Configure your printer IP in `.env`:
+
+```
+PRINTER_HOST=192.168.1.59
+PRINTER_PORT=9100
+PRINTER_TEST_MESSAGE=Hello from Pizza & Pasta
+```
+
+Run a test print:
+
+```
+npm run print:test
+```
+
+Or pass args directly:
+
+```
+npm run print:test -- --host 192.168.1.59 --port 9100 --message "Test via args"
+```
+
+### Printing via Windows Spooler (PDF)
+
+List printers:
+
+```
+npm run print:list
+```
+
+Set `.env` if you want a specific printer:
+
+```
+WINDOWS_PRINTER_NAME=HP301B84E019D9
+```
+
+Print a test PDF:
+
+```
+npm run print:pdf
+```
+
+Or specify the printer via args:
+
+```
+npm run print:pdf -- --printer "HP301B84E019D9"
+```
 
 ## Features (Done)
 - Security middleware: helmet, CORS allowlist, validation, cookies, rate limit (global + auth), CSRF (double-submit)
@@ -146,3 +192,40 @@ Documentation consolidation: Former files (SETUP/ARCHITECTURE/TESTING/DOCUMENTAT
 
 Changelog
 - 2025-09: Lockout, pino-http request IDs, HSTS in prod, admin DTO validation, CSRF flow docs.
+
+## Performance Notes (Menu Endpoint)
+
+Observed symptom (production Render free tier): First load of `/api/menu` sometimes ~60s while local dev is fast (<100ms). Root causes & fixes implemented:
+
+1. Cold start + empty DB: The app attempted a Prisma query every request even when the `MenuItem` table was empty (fresh deploy), then fell back to reading `menu.json`. On a cold instance with limited CPU/IO, repeated file reads + failed DB query amplified latency.
+2. No timing visibility: Hard to verify whether delay was DB connect, query, or JSON fallback.
+3. Full-table scan in search: `GET /api/menu/search` fetched all columns then filtered in-memory.
+4. Repeated JSON parse: Without a warm cache on cold start the JSON file was parsed more than needed.
+
+Mitigations now in place:
+* In-memory caching for list & search (already existed) improved with a DB-empty sentinel (5 min TTL) to skip unnecessary DB queries when menu table is empty.
+* Timing instrumentation behind `DEBUG_MENU_TIMING=true` for: DB fetch, JSON load, filter operations, and overall handler duration.
+* Improved ETag generation (fallback hash of ids/basePrice when `updatedAt` absent) enabling 304 responses for JSON-backed data.
+* Optimized search to only `select` required fields and log timings.
+* Optional pre-warm: set `PREWARM_MENU=true` to load menu items and open DB connection at boot (see `main.ts`).
+
+Env vars influencing behaviour:
+```
+MENU_CACHE_TTL_MS=60000          # list/search memory cache TTL
+MENU_JSON_TTL_MS=300000          # JSON file cache TTL
+DEBUG_MENU_TIMING=true           # log detailed timings
+PREWARM_MENU=true                # warm DB + cache on startup
+```
+
+Operational recommendations (Render free tier):
+* Enable a cron/keepalive ping every 10–15 minutes to avoid container sleep (already have `keepalive` script at repo root).
+* Enable `PREWARM_MENU=true` so first user doesn't pay DB connection + data hydration cost.
+* After migrating real menu items into DB, run `seed:menu` then remove the empty-table condition by ensuring at least 1 row exists; sentinel logic will naturally stop using JSON fallback.
+
+Diagnostics checklist if slow menu persists:
+1. Set `DEBUG_MENU_TIMING=true` and hit `/api/menu`; check logs for where time is spent.
+2. Confirm whether logs show `dbFetch` vs `jsonLoad` dominance.
+3. Check Render instance metrics (disk IO throttling or cold start).
+4. Run a manual query against Postgres to ensure low latency (<50ms typical).
+5. If network latency high, consider enabling CDN caching for `/api/menu` (cache 60s) since response already public + immutable within short windows.
+

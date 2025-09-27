@@ -2,11 +2,25 @@ import CategoryChips from '../components/CategoryChips';
 import Carousel from '../components/Carousel';
 import { ShoppingCartIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../services/api';
 import { menuImg } from '../utils/assets';
 import { useCart } from '../store/cartStore';
 import { useNavigate, Link } from 'react-router-dom';
+
+type Translated<T> = T | { en: string; th: string };
+interface MenuFeaturedItem {
+  id: string;
+  category: string;
+  name: Translated<string>;
+  description?: Translated<string> | null;
+  images?: string[];
+  image?: string;
+  basePrice?: number;
+  price?: number;
+  priceL?: number;
+  priceXL?: number;
+}
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
@@ -14,25 +28,55 @@ export default function HomePage() {
   const { addItem } = useCart();
   const navigate = useNavigate();
 
-  const [featured, setFeatured] = useState<any[]>([]);
+  const [featured, setFeatured] = useState<MenuFeaturedItem[]>([]);
   const [added, setAdded] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const { data } = await api.get('/menu');
-        const arr = Array.isArray(data) ? data : [];
-        const pick = (cat: string) => arr.find((m: any) => m.category === cat);
-        setFeatured([pick('pizza'), pick('dessert'), pick('pasta'), pick('appetizer')].filter(Boolean));
-      } catch {
+        const resp = await api.get('/menu', { signal: controller.signal });
+        const data = resp.data;
+        const arr: MenuFeaturedItem[] = Array.isArray(data) ? data : [];
+        const catOrder = ['pizza', 'dessert', 'pasta', 'appetizer'];
+        const picks = catOrder.map(cat => arr.find(m => m.category === cat)).filter(Boolean) as MenuFeaturedItem[];
+        setFeatured(picks);
+      } catch (e: any) {
+        if (e?.name === 'CanceledError' || e?.name === 'AbortError') return; // ignore
+        console.warn('[HomePage] failed to load featured menu', e);
+        setError(t('load_error', 'Failed to load menu'));
         setFeatured([]);
+      } finally {
+        setLoading(false);
       }
     })();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Local hero image from assets for consistent display; fallback to margherita
   const heroUrl = new URL('../assets/images/menu/pizza-margherita.jpg', import.meta.url).href;
 
-  const priceOf = (item: any) => item.basePrice ?? item.price ?? item.priceL ?? item.priceXL ?? 0;
+  const priceOf = (item: MenuFeaturedItem) => item.basePrice ?? item.price ?? item.priceL ?? item.priceXL ?? 0;
+
+  const skeletonCards = useMemo(() => Array.from({ length: 4 }).map((_, i) => (
+    <div key={i} className="animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800 aspect-[4/5]" />
+  )), []);
+
+  // Preload /menu route on hover of hero CTA for snappier navigation
+  const prefetchMenu = () => {
+    if ((window as any).__menuPrefetched) return;
+    (window as any).__menuPrefetched = true;
+    // fire-and-forget
+    api.get('/menu').catch(() => {});
+  };
 
   return (
     <div className="space-y-10">
@@ -51,7 +95,13 @@ export default function HomePage() {
               {t('hero_subtitle')}
             </p>
             <div className="mt-10 md:mt-12 flex w-full justify-center">
-              <a href="/menu" className="btn-primary text-center px-6 py-3 text-base md:text-lg">{t('order_now')}</a>
+              <a
+                href="/menu"
+                onMouseEnter={prefetchMenu}
+                onFocus={prefetchMenu}
+                className="btn-primary text-center px-6 py-3 text-base md:text-lg"
+                aria-label={t('order_now')}
+              >{t('order_now')}</a>
             </div>
           </div>
         </div>
@@ -77,19 +127,29 @@ export default function HomePage() {
 
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">{t('menu')}</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {featured.map((it) => (
+  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4" aria-live="polite">
+          {loading && skeletonCards}
+          {!loading && !featured.length && !error && (
+            <div className="col-span-full text-sm text-slate-500">{t('no_featured', 'No featured items yet')}</div>
+          )}
+          {error && (
+            <div className="col-span-full text-sm text-rose-600" role="alert">{error}</div>
+          )}
+          {!loading && featured.map((it) => (
             <div
               key={it.id}
               className="card overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-xl cursor-pointer"
               onClick={() => navigate(`/menu/${it.id}`)}
+              aria-label={typeof it.name === 'object' ? tt(it.name) : (it.name || '')}
             >
               <img src={menuImg((it.images && it.images[0]) || it.image)} alt={typeof it.name === 'object' ? tt(it.name) : (it.name || '')} className="aspect-video w-full object-cover" />
               <div className="p-4 flex-1 flex flex-col">
                 <div className="text-sm uppercase tracking-wide text-slate-500">{it.category}</div>
                 <h3 className="mt-1 font-semibold text-lg">{typeof it.name === 'object' ? tt(it.name) : (it.name || '')}</h3>
                 <p className="mt-2 text-sm text-slate-600 line-clamp-4">
-                  {typeof it.description === 'object' ? tt(it.description) : (it.description || '')}
+                  {it.description
+                    ? (typeof it.description === 'object' ? tt(it.description as { en: string; th: string }) : (it.description || ''))
+                    : ''}
                 </p>
                 <div className="mt-3 font-semibold">฿ {priceOf(it).toFixed(0)}</div>
                 <button
@@ -107,17 +167,14 @@ export default function HomePage() {
                     setTimeout(() => setAdded((prev) => ({ ...prev, [key]: false })), 2000);
                   }}
                   disabled={!!added[String(it.id)] && !((it.priceL || it.priceXL))}
+                  aria-live="polite"
                 >
                   { (it.priceL || it.priceXL) ? (
-                    <> {t('choose_options', 'Choose Options')} </>
+                    <span>{t('choose_options', 'Choose Options')}</span>
                   ) : added[String(it.id)] ? (
-                    <>
-                      <CheckIcon className="size-5 mr-2" /> {t('added_to_cart', 'Added!')}
-                    </>
+                    <span className="inline-flex items-center"><CheckIcon className="size-5 mr-2" /> {t('added_to_cart', 'Added!')}</span>
                   ) : (
-                    <>
-                      <ShoppingCartIcon className="size-5 mr-2" /> {t('add_to_cart')}
-                    </>
+                    <span className="inline-flex items-center"><ShoppingCartIcon className="size-5 mr-2" /> {t('add_to_cart')}</span>
                   )}
                 </button>
               </div>

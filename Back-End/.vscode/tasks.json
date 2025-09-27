@@ -61,6 +61,31 @@
 			"command": "echo tasks",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "backend: install deps",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"ci"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "backend test",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
 		}
 	]
 }

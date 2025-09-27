@@ -5,6 +5,11 @@ export const api = axios.create({
   withCredentials: true,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-CSRF-Token',
+  // Treat 304 (Not Modified) as a successful response so callers can handle cached data
+  validateStatus: (status) => {
+    if (status === 304) return true; // resolve instead of reject
+    return status >= 200 && status < 300;
+  }
 });
 
 function getCookie(name: string): string | undefined {
@@ -68,6 +73,7 @@ export const endpoints = {
   paymentStatus: (orderId: string) => api.get(`/payments/${orderId}/status`),
   getOrder: (orderId: string) => api.get(`/orders/${orderId}`),
   myOrders: () => api.get('/orders/my'),
+  reprint: (orderId: string) => api.post(`/orders/${orderId}/print`),
   createPromptPay: (body: { orderId: string; amount: number }) => api.post('/payments/promptpay/create', body),
   createOmisePromptPay: (body: { orderId: string; amount: number; description?: string }) => api.post('/payments/omise/promptpay', body),
   omiseCharge: (body: { orderId: string; amount: number; token: string; description?: string }) => api.post('/payments/omise/charge', body),

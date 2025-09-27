@@ -42,8 +42,8 @@ Epic Pizza & Pasta is a bilingual (EN/TH) web app for browsing menu items, placi
 
 - Back-End (NestJS + Prisma + PostgreSQL)
   - Controllers: public (menu, orders, payments, contact, estimate, health), auth, admin
-  - Security: Helmet/HSTS, CORS allowlist, HPP, rate limit, CSRF (double-submit), ValidationPipe
-  - Auth: JWT (RS256) with HttpOnly cookies (access/refresh)
+  - Security: Helmet/HSTS, CORS allowlist, HPP, layered rate limits, CSRF (double-submit), ValidationPipe (whitelist + forbid), env schema validation
+  - Auth: JWT (RS256) with HttpOnly cookies (access/refresh) + refresh token rotation (sha256 hash stored & verified)
   - Payments: PromptPay QR + webhook verification
   - Health: GET /api/health
 
@@ -68,10 +68,10 @@ Highlights
 - Logging: pino-http + morgan
 
 Next improvements
-- Refresh token rotation + revocation store
 - Swagger/OpenAPI docs & typed client
-- Wider audit logging and tests in CI
+- Wider audit logging and tests in CI (additional negative-path security tests)
 - FE performance (code splitting, image optimization)
+- Advanced RBAC / permissions and session management
 
 ## Deployment
 
@@ -89,5 +89,6 @@ See DEPLOYMENT.md. A Render blueprint is provided in render.yaml.
 - Back-End/README.md — setup, architecture, security, testing, scripts
 - Back-End/API-CONTRACT.md — endpoint shapes and payloads
 - Front-End/README.md — setup, architecture, testing, design/security notes
+- SECURITY.md — consolidated security controls and recommendations
 
-Last updated: 2025-09-19
+Last updated: 2025-09-25

@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, Inject } from '@nestjs/common';
+// Prisma namespace types avoided here to simplify build in test env
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildPromptPayPayload } from '../utils/promptpay';
 import { prisma } from '../prisma';
@@ -8,14 +8,20 @@ import { enqueue } from '../utils/job-queue';
 import { computePricing, formatEta } from '../utils/pricing';
 import { sendOrderEmail } from '../utils/email';
 import { OrdersEvents } from './orders.events';
+import { OrdersPrintService } from './orders.print';
+import { normalizeThaiPhone } from '../utils/phone';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly events?: OrdersEvents) {}
+  constructor(
+    private readonly events: OrdersEvents,
+    @Inject(OrdersPrintService) private readonly printer: OrdersPrintService,
+  ) {}
   // In-memory guard to avoid duplicate Google Sheets appends per order id (process lifetime)
   private appendedOrderIds = new Set<string>();
   async listByPhone(phone: string) {
-    return prisma.order.findMany({ where: { phone }, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
+    const normalized = normalizeThaiPhone(phone);
+    return prisma.order.findMany({ where: { phone: normalized }, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
   }
   async listForUser(userId: string) {
     // Primary: orders explicitly linked to userId
@@ -62,7 +68,8 @@ export class OrdersService {
       // If userId not provided but phone matches a user, resolve it
       let resolvedUserId: string | undefined = userId ?? undefined;
       if (!resolvedUserId && dto.customer.phone) {
-        const u = await prisma.user.findFirst({ where: { phone: dto.customer.phone } });
+        const normalizedPhone = normalizeThaiPhone(dto.customer.phone);
+        const u = await prisma.user.findFirst({ where: { phone: normalizedPhone } });
         // coalesce potential null to undefined to satisfy Prisma's UserWhereUniqueInput
         resolvedUserId = (u?.id ?? undefined) as string | undefined;
       }
@@ -70,7 +77,7 @@ export class OrdersService {
       created = await prisma.order.create({
         data: {
           customerName: dto.customer.name,
-          phone: dto.customer.phone,
+          phone: normalizeThaiPhone(dto.customer.phone),
           address: dto.customer.address,
           lat: dto.customer.lat,
           lng: dto.customer.lng,
@@ -126,7 +133,8 @@ export class OrdersService {
                 nameSnapshot: it.name,
                 priceSnapshot: it.price,
                 qty: it.qty,
-                options: (it.options === undefined ? undefined : (it.options === null ? Prisma.JsonNull : (it.options as Prisma.InputJsonValue))),
+                // Simplified typing for JSON options to avoid dependency on Prisma namespace types
+                options: (it as any).options as any,
               },
             });
           } catch (ie: unknown) {
@@ -191,7 +199,7 @@ export class OrdersService {
         paymentMethod: order.paymentMethod,
         status: order.status,
         createdAt: order.createdAt,
-        items: order.items?.map((it) => ({ nameSnapshot: it.nameSnapshot, qty: it.qty, priceSnapshot: it.priceSnapshot })),
+  items: order.items?.map((it: any) => ({ nameSnapshot: it.nameSnapshot, qty: it.qty, priceSnapshot: it.priceSnapshot })),
         payment: { status: order.payment?.status },
       } as const;
       enqueue({
@@ -286,6 +294,10 @@ export class OrdersService {
     if (status === 'delivered') data.deliveredAt = new Date();
   const order = await prisma.order.update({ where: { id }, data });
   try { this.events?.emit(order.id, 'order.status', { status: order.status, driverName: (order as any).driverName }); } catch {}
+    // Auto-print when an order is confirmed/received
+    if (status === 'received') {
+      try { this.printer?.enqueuePrint(order.id); } catch {}
+    }
     if (process.env.GOOGLE_SHEET_ID) {
       enqueue({
         id: `sheets:update-status:${order.id}:${status}`,
@@ -322,5 +334,42 @@ export class OrdersService {
       expectedDeliveryAt: anyOrder.expectedDeliveryAt || undefined,
     } as any);
     return { id: order.id, status: order.status, ...eta };
+  }
+
+  async requestPrint(orderId: string, requesterUserId: string) {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true, phone: true } });
+    if (!order) {
+      const err: any = new Error('Order not found'); err.status = 404; throw err;
+    }
+    // Allow if owned by user or phone matches user's phone (legacy orders)
+    if (order.userId !== requesterUserId) {
+      const user = await prisma.user.findUnique({ where: { id: requesterUserId }, select: { phone: true } });
+      const userPhone = user?.phone ? normalizeThaiPhone(user.phone) : undefined;
+      const orderPhone = order.phone ? normalizeThaiPhone(order.phone) : undefined;
+      if (!userPhone || !orderPhone || userPhone !== orderPhone) {
+        const err: any = new Error('Not permitted to print this order'); err.status = 403; throw err;
+      }
+    }
+    // Enqueue print job
+    this.printer?.enqueuePrint(orderId);
+    try { this.events?.emit(orderId, 'order.print', { ok: true }); } catch {}
+    return { ok: true };
+  }
+
+  async generateReceiptForDownload(orderId: string, requesterUserId: string) {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true, createdAt: true, phone: true } });
+    if (!order) { const err: any = new Error('Order not found'); err.status = 404; throw err; }
+    if (order.userId !== requesterUserId) {
+      const user = await prisma.user.findUnique({ where: { id: requesterUserId }, select: { phone: true } });
+      const userPhone = user?.phone ? normalizeThaiPhone(user.phone) : undefined;
+      const orderPhone = (order as any).phone ? normalizeThaiPhone((order as any).phone) : undefined;
+      if (!userPhone || !orderPhone || userPhone !== orderPhone) {
+        const err: any = new Error('Not permitted to access this receipt'); err.status = 403; throw err;
+      }
+    }
+    const filePath = await this.printer!.generateReceipt(orderId);
+    const ts = order.createdAt ? new Date(order.createdAt).toISOString().slice(0,19).replace(/[:T]/g,'-') : 'receipt';
+    const filename = `receipt-${order.id.slice(0,8)}-${ts}.pdf`;
+    return { filePath, filename };
   }
 }

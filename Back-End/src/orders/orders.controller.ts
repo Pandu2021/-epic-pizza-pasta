@@ -6,6 +6,8 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Request } from 'express';
 import { auth } from '../auth/auth.service';
+import fs from 'node:fs'
+import path from 'node:path'
 
 @Controller('api/orders')
 export class OrdersController {
@@ -94,6 +96,42 @@ export class OrdersController {
   @Get(':id/eta')
   eta(@Param('id') id: string) {
     return this.orders.eta(id);
+  }
+
+  // Reprint endpoint: authenticated user can request a reprint of their own order's receipt
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/print')
+  async print(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user?.id as string;
+    try {
+      await this.orders.requestPrint(id, userId);
+      return { ok: true };
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to queue print job';
+      const status = e?.status || HttpStatus.BAD_REQUEST;
+      throw new HttpException({ message: msg }, status);
+    }
+  }
+
+  // Download receipt as PDF
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/receipt.pdf')
+  async receipt(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+    try {
+      const userId = (req as any).user?.id as string;
+      const { filePath, filename } = await this.orders.generateReceiptForDownload(id, userId);
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+      });
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to generate receipt';
+      const status = e?.status || HttpStatus.BAD_REQUEST;
+      throw new HttpException({ message: msg }, status);
+    }
   }
 
   @Get(':id/stream')

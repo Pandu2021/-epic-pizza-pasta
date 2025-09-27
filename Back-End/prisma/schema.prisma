@@ -14,6 +14,7 @@ model User {
   role         String   @default("customer")
   name         String?
   phone        String?
+  refreshTokenHash String? // stores hashed latest refresh token for rotation / revocation
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   orders       Order[]

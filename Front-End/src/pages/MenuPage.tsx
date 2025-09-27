@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ProductCard from '../components/ProductCard';
@@ -20,27 +20,70 @@ export default function MenuPage() {
   const query = useMemo(() => (new URLSearchParams(search).get('q') ?? '').trim(), [search]);
   
   // If navigated with a hash (e.g. /menu#cat-pizza), scroll to that section on mount
+  const etagRef = useRef<string | null>(null);
   useEffect(() => {
-    // fetch menu from API
+    let aborted = false;
+    const controller = new AbortController();
     (async () => {
       try {
         if (query) {
           try {
-            const { data } = await api.get('/menu/search', { params: { q: query } });
-            if (Array.isArray(data) && data.length > 0) {
+            const { data } = await api.get('/menu/search', { params: { q: query }, signal: controller.signal as any });
+            if (!aborted && Array.isArray(data) && data.length > 0) {
               setMenuItems(data);
+              setLoading(false);
               return;
             }
+          } catch (err: any) {
+            if (err?.name === 'CanceledError' || err?.name === 'AbortError') return;
+            // ignore search failure; we'll fall back to list
+          }
+        }
+        // Try sessionStorage cache using last etag
+        const cacheKey = 'menu:cache:etag';
+        const cachedEtag = sessionStorage.getItem(cacheKey);
+        const cachedDataRaw = cachedEtag ? sessionStorage.getItem(`menu:data:${cachedEtag}`) : null;
+        if (cachedDataRaw) {
+          try {
+            const parsed = JSON.parse(cachedDataRaw);
+            setMenuItems(parsed);
+            setLoading(false);
           } catch {}
         }
-        const { data } = await api.get('/menu');
-        setMenuItems(Array.isArray(data) ? data : []);
-      } catch (e) {
-        setError('Failed to load menu');
-      } finally {
-        setLoading(false);
+        const headers: Record<string,string> = {};
+        if (cachedEtag) headers['If-None-Match'] = cachedEtag;
+        const resp = await api.get('/menu', { signal: controller.signal as any, headers });
+        const etag = (resp as any).headers?.['etag'] || (resp as any).headers?.get?.('etag');
+        if (etag) etagRef.current = etag;
+        if (!aborted) {
+          if (resp.status === 304) {
+            // Not modified – we already rendered cached data if present
+            console.debug('[MenuPage] 304 Not Modified');
+          } else {
+            const data = resp.data;
+            if (Array.isArray(data)) {
+              setMenuItems(data);
+              if (etag) {
+                sessionStorage.setItem('menu:cache:etag', etag);
+                sessionStorage.setItem(`menu:data:${etag}`, JSON.stringify(data));
+              }
+            }
+          }
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (!aborted) {
+          if (e?.name === 'CanceledError' || e?.name === 'AbortError') return;
+          console.warn('[MenuPage] failed to load menu', e);
+          setError('Failed to load menu');
+          setLoading(false);
+        }
       }
     })();
+    return () => {
+      aborted = true;
+      controller.abort();
+    };
   }, [query]);
 
   // After content is loaded/rendered, perform hash scroll (e.g., /menu#cat-pasta)

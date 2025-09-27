@@ -49,9 +49,10 @@ export class AuthController {
       const user = await prisma.user.create({ data: { email, passwordHash, name, phone } });
 
       // Auto-login (issue tokens) for smoother UX; same cookie options as login
-      const payload = { id: user.id, email: user.email, role: user.role };
-      const access = auth.signAccess(payload);
-      const refresh = auth.signRefresh(payload);
+  const payload = { id: user.id, email: user.email, role: user.role };
+  const access = auth.signAccess(payload);
+  const refresh = auth.signRefresh(payload);
+  await auth.storeRefreshToken(user.id, refresh);
       const cookieOpts = {
         httpOnly: true,
         sameSite: 'lax' as const,
@@ -110,9 +111,10 @@ export class AuthController {
       // success: reset counter
       store.delete(key);
       (req as any)?.log?.info({ userId: user.id, email, ip }, 'login success');
-    const payload = { id: user.id, email: user.email, role: user.role };
-    const access = auth.signAccess(payload);
-    const refresh = auth.signRefresh(payload);
+  const payload = { id: user.id, email: user.email, role: user.role };
+  const access = auth.signAccess(payload);
+  const refresh = auth.signRefresh(payload);
+  await auth.storeRefreshToken(user.id, refresh);
     const cookieOpts = {
       httpOnly: true,
       sameSite: 'lax' as const,
@@ -163,18 +165,29 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const r = req.cookies?.refresh_token as string | undefined;
     if (!r) return { ok: false };
-    const payload = auth.verify(r);
-    if (!payload) return { ok: false };
-    const access = auth.signAccess(payload);
-    res.cookie('access_token', access, {
+    const rotated = await auth.verifyAndRotateRefreshToken(r);
+    if (!rotated) {
+      // Clear potentially compromised tokens
+      res.clearCookie('access_token', { path: '/' });
+      res.clearCookie('refresh_token', { path: '/' });
+      return { ok: false };
+    }
+    res.cookie('access_token', rotated.access, {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 15 * 60 * 1000,
+    });
+    res.cookie('refresh_token', rotated.refresh, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     return { ok: true };
   }

@@ -11,6 +11,10 @@ import http from 'http';
 import { URL } from 'url';
 
 const DEFAULT_INTERVAL_MINUTES = 14;
+const DEFAULT_URLS = [
+  'https://api.epicfoodorders.com/api/health',
+  'https://api.epicfoodorders.com/api/menu'
+];
 
 /**
  * Perform a single GET request to the supplied url.
@@ -53,27 +57,48 @@ export function ping(urlStr) {
 
 function minutes(n){return n*60*1000;}
 
+/**
+ * Normalize list of URLs from env/args/fallback
+ * @param {string[]} positionalArgs
+ */
+function getTargetUrls(positionalArgs){
+  // Prefer KEEPALIVE_URLS, then KEEPALIVE_URL (both allow comma-separated)
+  const envCombined = (process.env.KEEPALIVE_URLS || process.env.KEEPALIVE_URL || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const positional = (positionalArgs || []).filter(a => /^(https?:)/i.test(a));
+
+  const urls = envCombined.length ? envCombined : (positional.length ? positional : DEFAULT_URLS);
+  return Array.from(new Set(urls)); // de-dup
+}
+
 async function main(){
   // Collect args excluding node + script
   const rawArgs = process.argv.slice(2);
   const once = rawArgs.includes('--once');
   const cleaned = rawArgs.filter(a=>!a.startsWith('--'));
-  const positional = cleaned.filter(a => /^(https?:)/i.test(a));
-  let url = process.env.KEEPALIVE_URL || positional[0];
-  if (!url) {
-    // Default fallback set per user request
-    url = 'https://epicfoodorders.com/menu';
-    console.log('[keepalive] No KEEPALIVE_URL provided. Using default:', url);
+  const urls = getTargetUrls(cleaned);
+  if (!process.env.KEEPALIVE_URLS && !process.env.KEEPALIVE_URL && cleaned.length === 0) {
+    console.log('[keepalive] No KEEPALIVE_URL(S) provided. Using defaults:', urls.join(', '));
   }
   const intervalMinutes = Number(process.env.KEEPALIVE_INTERVAL_MINUTES) || DEFAULT_INTERVAL_MINUTES;
 
   const doPing = async () => {
-    const start = Date.now();
-    try {
-      const { status, ok } = await ping(url);
-      console.log(new Date().toISOString(), 'PING', url, status, ok ? 'OK' : 'NOT OK', (Date.now()-start)+'ms');
-    } catch (e) {
-      console.error(new Date().toISOString(), 'PING_ERROR', e.message);
+    const batchStart = Date.now();
+    for (const u of urls) {
+      const start = Date.now();
+      try {
+        const { status, ok } = await ping(u);
+        console.log(new Date().toISOString(), 'PING', u, status, ok ? 'OK' : 'NOT OK', (Date.now()-start)+'ms');
+      } catch (e) {
+        console.error(new Date().toISOString(), 'PING_ERROR', u, e.message);
+      }
+    }
+    const dur = Date.now() - batchStart;
+    if (dur > 5000) {
+      console.log(new Date().toISOString(), `BATCH_DONE in ${dur}ms for ${urls.length} url(s)`);
     }
   };
 

@@ -84,8 +84,8 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','X-CSRF-Token'],
-    exposedHeaders: ['X-Request-Id'],
+    allowedHeaders: ['Content-Type','Authorization','X-CSRF-Token','If-None-Match'],
+    exposedHeaders: ['X-Request-Id','ETag','Content-Disposition'],
   });
 
   app.useGlobalPipes(new ValidationPipe({

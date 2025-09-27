@@ -1,18 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function PaymentFailedPage() {
+  const { t } = useTranslation();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const orderId = params.get('orderId') || undefined;
-  const message = params.get('message') || 'Payment failed. Please try again.';
+  const message = params.get('message') || t('payment_failed.message_fallback');
   return (
     <section className="py-10 max-w-xl mx-auto text-center">
-      <h1 className="text-2xl font-bold mb-2">Payment Failed</h1>
+      <h1 className="text-2xl font-bold mb-2">{t('payment_failed.title')}</h1>
       <p className="text-slate-700 mb-4">{message}</p>
-      {orderId && <p className="text-sm text-gray-600">Order ID: <span className="font-mono">{orderId}</span></p>}
+      {orderId && <p className="text-sm text-gray-600">{t('payment_failed.order_id')} <span className="font-mono">{orderId}</span></p>}
       <div className="mt-6 flex justify-center gap-3">
-        <Link className="btn-outline" to="/checkout">Back to Checkout</Link>
-        <Link className="btn-primary" to="/menu">Continue Shopping</Link>
+        <Link className="btn-outline" to="/checkout">{t('payment_failed.back_to_checkout')}</Link>
+        <Link className="btn-primary" to="/menu">{t('payment_failed.continue_shopping')}</Link>
       </div>
     </section>
   );
