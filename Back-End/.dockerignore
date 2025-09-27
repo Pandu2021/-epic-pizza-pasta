@@ -1,0 +1,33 @@
+# Environment and secrets
+.env
+*.env
+*.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Node and build artifacts
+node_modules
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+dist
+build
+coverage
+
+# VCS and editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Prisma local env
+prisma/.env
+
+# OS files
+.DS_Store
+Thumbs.db
