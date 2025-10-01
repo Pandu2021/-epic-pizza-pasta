@@ -3,14 +3,35 @@ import * as GoogleApis from 'googleapis';
 import { ensureOrdersHeader, updateOrderStatusInSheet } from './sheets';
 
 // Build a mock sheets client
+const HEADER = [
+	'Timestamp',
+	'Order ID',
+	'Name',
+	'Phone',
+	'Address',
+	'Delivery',
+	'Items',
+	'Subtotal',
+	'DeliveryFee',
+	'Tax',
+	'Discount',
+	'Total',
+	'Method',
+	'PaymentStatus',
+	'OrderStatus',
+	'Driver',
+	'DeliveredAt',
+];
+
 function createMockSheets() {
-	const get = vi.fn().mockResolvedValue({ data: { values: [['Timestamp']] } });
+	const get = vi.fn().mockResolvedValue({ data: { values: [HEADER] } });
 	const append = vi.fn().mockResolvedValue({});
 	const update = vi.fn().mockResolvedValue({});
+	const valuesBatchUpdate = vi.fn().mockResolvedValue({});
 	const batchUpdate = vi.fn().mockResolvedValue({});
 	return {
 		spreadsheets: {
-			values: { get, append, update },
+			values: { get, append, update, batchUpdate: valuesBatchUpdate },
 			batchUpdate,
 		},
 	} as any;
@@ -48,7 +69,7 @@ describe('sheets utils', () => {
 		process.env.GOOGLE_SHEET_SERVICE_EMAIL = 'svc@example.com';
 		process.env.GOOGLE_SHEETS_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----';
 		// Mock google auth + client
-		const update = vi.fn().mockResolvedValue({});
+		const valuesBatchUpdate = vi.fn().mockResolvedValue({});
 		const get = vi.fn().mockResolvedValue({ data: { values: [
 			['Timestamp','Order ID','Name','Phone','Address','Delivery','Items','Subtotal','DeliveryFee','Tax','Discount','Total','Method','PaymentStatus','OrderStatus','Driver','DeliveredAt'],
 			['2024-01-01T00:00:00.000Z','order-123','A','P','Addr','delivery','','0','0','0','0','0','cod','unpaid','', '', ''],
@@ -57,21 +78,21 @@ describe('sheets utils', () => {
 			auth: { JWT: vi.fn().mockImplementation(() => ({})) },
 			sheets: () => ({
 				spreadsheets: {
-					values: { get, append: vi.fn(), update },
+					values: { get, append: vi.fn(), batchUpdate: valuesBatchUpdate },
 					batchUpdate: vi.fn(),
 				},
 			}),
 		} as any);
 		const ok = await updateOrderStatusInSheet('order-123', 'cancelled');
 		expect(ok).toBe(true);
-		expect(update).toHaveBeenCalled();
+		expect(valuesBatchUpdate).toHaveBeenCalled();
 	});
 
 	it('updateOrderStatusInSheet returns false if order not found', async () => {
 		process.env.GOOGLE_SHEET_ID = 'sheet1';
 		process.env.GOOGLE_SHEET_SERVICE_EMAIL = 'svc@example.com';
 		process.env.GOOGLE_SHEETS_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----';
-		const update = vi.fn().mockResolvedValue({});
+		const valuesBatchUpdate = vi.fn().mockResolvedValue({});
 		const get = vi.fn().mockResolvedValue({ data: { values: [
 			['Timestamp','Order ID','Name','Phone','Address','Delivery','Items','Subtotal','DeliveryFee','Tax','Discount','Total','Method','PaymentStatus','OrderStatus','Driver','DeliveredAt'],
 			['2024-01-01T00:00:00.000Z','order-999','A','P','Addr','delivery','','0','0','0','0','0','cod','unpaid','', '', ''],
@@ -80,13 +101,13 @@ describe('sheets utils', () => {
 			auth: { JWT: vi.fn().mockImplementation(() => ({})) },
 			sheets: () => ({
 				spreadsheets: {
-					values: { get, append: vi.fn(), update },
+					values: { get, append: vi.fn(), batchUpdate: valuesBatchUpdate },
 					batchUpdate: vi.fn(),
 				},
 			}),
 		} as any);
 		const ok = await updateOrderStatusInSheet('order-123', 'cancelled');
 		expect(ok).toBe(false);
-		expect(update).not.toHaveBeenCalled();
+		expect(valuesBatchUpdate).not.toHaveBeenCalled();
 	});
 });
