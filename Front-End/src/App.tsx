@@ -24,6 +24,8 @@ export default function App() {
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<HomePage />} />
           <Route path="/menu" element={<MenuPage />} />
+          {/* Deprecated product: Super Sampler now integrated; redirect to /menu (placed before :id) */}
+          <Route path="/menu/pizza-super-sampler" element={<Navigate to="/menu" replace />} />
           <Route path="/menu/:id" element={<ProductPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />

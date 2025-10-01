@@ -16,7 +16,7 @@ export default function Layout({ children }: Props) {
   const { count } = useCart();
   const [cartOpen, setCartOpen] = useState(false);
   const navigate = useNavigate();
-  const { search } = useLocation();
+  const { search, pathname } = useLocation();
   const [term, setTerm] = useState('');
 
   // Sync input with ?q= from URL when route changes
@@ -32,14 +32,23 @@ export default function Layout({ children }: Props) {
   };
 
   // Debounce navigate for live search while typing
+  const isMenuList = pathname === '/menu';
+  const isMenuDetail = pathname.startsWith('/menu/') && pathname !== '/menu';
+
   useEffect(() => {
     const handle = setTimeout(() => {
       const q = term.trim();
-      navigate(q ? `/menu?q=${encodeURIComponent(q)}` : '/menu', { replace: true });
-    }, 300);
+      if (isMenuList) {
+        navigate(q ? `/menu?q=${encodeURIComponent(q)}` : '/menu', { replace: true });
+        return;
+      }
+      if (q && !isMenuDetail) {
+        navigate(`/menu?q=${encodeURIComponent(q)}`);
+      }
+    }, 250);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [term]);
+  }, [term, isMenuList, isMenuDetail]);
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-20">

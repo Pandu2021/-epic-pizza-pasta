@@ -131,7 +131,10 @@
     "add_extras": "เพิ่มท็อปปิ้ง",
     "extras": {
       "extra-cheese": "ชีสเพิ่ม",
-      "garlic-butter": "เนยกระเทียม"
+      "garlic-butter": "เนยกระเทียม",
+      "pasta-garlic-chicken": "ไก่กระเทียม",
+      "pasta-shrimp-scampi-3": "กุ้งสแคมปี้ (3 ชิ้น)",
+      "pasta-crispy-bacon": "เบคอนกรอบ"
     },
     "notes_label": "หมายเหตุ (แพ้อาหาร, ไม่ใส่เครื่องบางอย่าง ฯลฯ)",
     "notes_placeholder": "มีคำขอพิเศษไหม?",

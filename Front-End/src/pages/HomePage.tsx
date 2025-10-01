@@ -45,8 +45,20 @@ export default function HomePage() {
         const resp = await api.get('/menu', { signal: controller.signal });
         const data = resp.data;
         const arr: MenuFeaturedItem[] = Array.isArray(data) ? data : [];
+        const featuredOverrides: Record<string, string> = {
+          pizza: 'pizza-cheese',
+        };
         const catOrder = ['pizza', 'dessert', 'pasta', 'appetizer'];
-        const picks = catOrder.map(cat => arr.find(m => m.category === cat)).filter(Boolean) as MenuFeaturedItem[];
+        const picks = catOrder
+          .map((cat) => {
+            const overrideId = featuredOverrides[cat];
+            if (overrideId) {
+              const override = arr.find((m) => m.id === overrideId);
+              if (override) return override;
+            }
+            return arr.find((m) => m.category === cat);
+          })
+          .filter(Boolean) as MenuFeaturedItem[];
         setFeatured(picks);
       } catch (e: any) {
         if (e?.name === 'CanceledError' || e?.name === 'AbortError') return; // ignore

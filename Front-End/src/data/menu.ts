@@ -142,17 +142,7 @@ export const menuItems: MenuItem[] = [
   priceL: 379,
     image: img('pizza-truffle.jpg')
   },
-  {
-    id: 'pizza-super-sampler',
-    category: 'pizza',
-    name: { en: 'Super Sampler (XL only)', th: 'ซูเปอร์แซมเปลอร์ (XL เท่านั้น)' },
-    description: {
-      en: 'XL 15\" only. Choose up to 4 flavors (every 2 slices).',
-      th: 'มีเฉพาะขนาด XL 15\" เลือกได้สูงสุด 4 รสชาติ (ทุก 2 ชิ้น)'
-    },
-    priceXL: 550,
-    image: img('pizza-hawaiian.jpg')
-  },
+  // Super Sampler item removed; sampler is now selectable within any pizza (XL only)
   // Pasta
   {
     id: 'pasta-beef-stroganoff',

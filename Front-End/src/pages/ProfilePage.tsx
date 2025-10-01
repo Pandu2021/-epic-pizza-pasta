@@ -109,12 +109,29 @@ const ProfilePage = () => {
   }, [me]);
 
   // Derived filtered + paginated
+  // De-duplicate orders by id (prefer the most recent createdAt if duplicates exist)
+  const dedupedOrders = useMemo(() => {
+    const byId = new Map<string, { id: string; createdAt: string; total: number; status: string; deliveryType?: string; payment?: { status: string; method: string } }>();
+    for (const o of orders) {
+      const prev = byId.get(o.id);
+      if (!prev) { byId.set(o.id, o); continue; }
+      // pick the newer createdAt entry
+      const currTs = Date.parse(o.createdAt || '');
+      const prevTs = Date.parse(prev.createdAt || '');
+      if (isFinite(currTs) && isFinite(prevTs) && currTs >= prevTs) byId.set(o.id, o);
+    }
+    // return in createdAt desc order
+    return Array.from(byId.values()).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  }, [orders]);
+
   const filteredOrders = useMemo(() => {
-    let arr = orders;
+    let arr = dedupedOrders;
+    // Avoid duplicate visual entries: if we show an Active Order card, exclude it from the list below
+    if (activeOrder) arr = arr.filter(o => o.id !== activeOrder.id);
     if (filterStatus !== 'all') arr = arr.filter(o => (o.status || '').toLowerCase() === filterStatus);
     if (filterMethod !== 'all') arr = arr.filter(o => (o.payment?.method || '').toLowerCase() === filterMethod);
     return arr;
-  }, [orders, filterStatus, filterMethod]);
+  }, [dedupedOrders, filterStatus, filterMethod, activeOrder?.id]);
 
   // Determine latest in-flight order (received|preparing|completed but not delivered/cancelled) preferring most recent
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min, ValidateNested } from 'class-validator';
 
 export class OrderItemDto {
   @IsString()
@@ -9,6 +9,10 @@ export class OrderItemDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 
   @IsInt()
   @Min(1)
@@ -33,9 +37,10 @@ export class CustomerDto {
   @Matches(/^(\+66\d{8,9}|0\d{9})$/)
   phone!: string; // Accepts 0XXXXXXXXX or +66XXXXXXXX/XXXXXXXXX (cleaned of spaces/dashes); stored normalized to +66 at service layer
 
+  // Address required only for delivery; optional for pickup. Service layer will enforce.
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  address!: string;
+  address?: string;
 
   @IsOptional()
   @IsNumber()

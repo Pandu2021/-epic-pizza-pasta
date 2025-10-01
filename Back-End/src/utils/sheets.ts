@@ -60,6 +60,11 @@ export async function appendOrderToSheet(order: OrderLike): Promise<boolean> {
 		const when = order.createdAt ? new Date(order.createdAt) : new Date();
 		const paymentStatus = (order.payment?.status as string | undefined) || 'unknown';
 
+		// For pickup orders with COD, present payment method as 'cash' in Sheets
+		const paymentMethodOut = (String(order.deliveryType).toLowerCase() === 'pickup' && String(order.paymentMethod).toLowerCase() === 'cod')
+			? 'cash'
+			: order.paymentMethod;
+
 		const values = [
 			[
 				when.toISOString(),
@@ -74,7 +79,7 @@ export async function appendOrderToSheet(order: OrderLike): Promise<boolean> {
 				order.tax,
 				order.discount,
 				order.total,
-				order.paymentMethod,
+				paymentMethodOut,
 				paymentStatus,
 				order.status || '', // OrderStatus column (logical status)
 				'', // Driver (future use)
@@ -127,9 +132,11 @@ async function ensurePrintHeader(sheets: ReturnType<typeof google.sheets>, sprea
 		'OrderStatus',     // logical order status
 	];
 	let hasHeader = false;
+	let existing: string[] | undefined;
 	try {
 		const getRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A1:M1` });
 		const first = (getRes.data as any)?.values?.[0];
+		existing = first as string[] | undefined;
 		if (first && first[0] === 'Timestamp') hasHeader = true;
 	} catch { /* sheet may not exist yet */ }
 	if (!hasHeader) {
@@ -141,6 +148,12 @@ async function ensurePrintHeader(sheets: ReturnType<typeof google.sheets>, sprea
 			if (!/already exists/i.test(String(msg))) console.warn('[sheets.print] addSheet warning:', msg);
 		}
 		await sheets.spreadsheets.values.update({ spreadsheetId, range: `${sheetName}!A1:M1`, valueInputOption: 'RAW', requestBody: { values: [HEADER] } });
+	} else {
+		// Header row exists; if any expected labels are missing/blank, repair the header row in-place
+		const needsRepair = !existing || HEADER.some((label, idx) => (existing![idx] || '').trim() !== label);
+		if (needsRepair) {
+			await sheets.spreadsheets.values.update({ spreadsheetId, range: `${sheetName}!A1:M1`, valueInputOption: 'RAW', requestBody: { values: [HEADER] } });
+		}
 	}
 }
 
@@ -159,6 +172,9 @@ export async function appendOrderItemsToPrintSheet(order: OrderLike): Promise<bo
 		await ensurePrintHeader(sheets, sheetId, sheetName).catch(()=>{});
 		const when = order.createdAt ? new Date(order.createdAt) : new Date();
 		const paymentStatus = (order.payment?.status as string | undefined) || 'unknown';
+		const paymentMethodOut = (String(order.deliveryType).toLowerCase() === 'pickup' && String(order.paymentMethod).toLowerCase() === 'cod')
+			? 'cash'
+			: order.paymentMethod;
 		const rows = items.map(it => [
 			when.toISOString(),
 			order.id,
@@ -170,7 +186,7 @@ export async function appendOrderItemsToPrintSheet(order: OrderLike): Promise<bo
 			order.phone,
 			order.address,
 			order.deliveryType || '',
-			order.paymentMethod,
+			paymentMethodOut,
 			paymentStatus,
 			order.status || '',
 		]);
@@ -305,13 +321,14 @@ export async function ensureOrdersHeader(
 	];
 
 	let hasHeader = false;
+	let existing: string[] | undefined;
 	try {
 		const getRes = await sheets.spreadsheets.values.get({
 			spreadsheetId,
 			range: 'Orders!A1:Q1',
 		});
-		const firstRow = (getRes.data as any)?.values?.[0] as string[] | undefined;
-		if (firstRow && firstRow[0] === 'Timestamp') {
+		existing = (getRes.data as any)?.values?.[0] as string[] | undefined;
+		if (existing && existing[0] === 'Timestamp') {
 			hasHeader = true;
 		}
 	} catch (e) {
@@ -328,13 +345,24 @@ export async function ensureOrdersHeader(
 			const msg = e?.response?.data?.error?.message || e?.message || e;
 			console.warn('[sheets] addSheet warning:', msg);
 		}
-		// Header now has one more column (A1:O1)
+		// Header now has one more column (A1:Q1)
 		await sheets.spreadsheets.values.update({
 			spreadsheetId,
 			range: 'Orders!A1:Q1',
 			valueInputOption: 'RAW',
 			requestBody: { values: [HEADER] },
 		});
+	} else {
+		// If header exists but any column name is blank or mismatched, repair the header row
+		const needsRepair = !existing || HEADER.some((label, idx) => (existing![idx] || '').trim() !== label);
+		if (needsRepair) {
+			await sheets.spreadsheets.values.update({
+				spreadsheetId,
+				range: 'Orders!A1:Q1',
+				valueInputOption: 'RAW',
+				requestBody: { values: [HEADER] },
+			});
+		}
 	}
 }
 
@@ -363,6 +391,8 @@ export async function updateOrderStatusInSheet(orderId: string, newStatus: strin
 		const header = rows[0];
 		const orderIdCol = header.indexOf('Order ID');
 		const orderStatusCol = header.indexOf('OrderStatus');
+		const paymentStatusCol = header.indexOf('PaymentStatus');
+		const deliveredAtCol = header.indexOf('DeliveredAt');
 		if (orderIdCol === -1 || orderStatusCol === -1) {
 			console.warn('[sheets.updateStatus] Required columns missing');
 			return false;
@@ -378,15 +408,20 @@ export async function updateOrderStatusInSheet(orderId: string, newStatus: strin
 			console.warn('[sheets.updateStatus] Order ID not found', orderId);
 			return false;
 		}
-		// Build A1 notation for the cell (columns: A=0 -> convert)
-		const colLetter = columnNumberToLetter(orderStatusCol + 1); // +1 because columnNumberToLetter is 1-based
-		const range = `Orders!${colLetter}${targetRow + 1}`; // +1 to convert array index to sheet row number
-		await sheets.spreadsheets.values.update({
-			spreadsheetId: sheetId,
-			range,
-			valueInputOption: 'USER_ENTERED',
-			requestBody: { values: [[newStatus]] },
-		});
+		// Build updates for OrderStatus and optionally PaymentStatus (refund on cancel)
+		const updates: { range: string; values: string[][] }[] = [];
+		const statusCell = `Orders!${columnNumberToLetter(orderStatusCol + 1)}${targetRow + 1}`;
+		updates.push({ range: statusCell, values: [[newStatus]] });
+		if (String(newStatus).toLowerCase() === 'cancelled' && paymentStatusCol !== -1) {
+			const payCell = `Orders!${columnNumberToLetter(paymentStatusCol + 1)}${targetRow + 1}`;
+			updates.push({ range: payCell, values: [['refunded']] });
+		}
+		// When delivered, stamp DeliveredAt with current ISO time if column exists
+		if (String(newStatus).toLowerCase() === 'delivered' && deliveredAtCol !== -1) {
+			const delCell = `Orders!${columnNumberToLetter(deliveredAtCol + 1)}${targetRow + 1}`;
+			updates.push({ range: delCell, values: [[new Date().toISOString()]] });
+		}
+		await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: sheetId, requestBody: { data: updates, valueInputOption: 'USER_ENTERED' } });
 		console.log(`[sheets.updateStatus] Updated order ${orderId} => ${newStatus}`);
 		return true;
 	} catch (e: any) {
@@ -429,6 +464,7 @@ export async function rebuildOrdersSheet(orders: Array<OrderLike & { payment?: a
 		const values = orders.map(o => {
 			const when = o.createdAt ? new Date(o.createdAt) : new Date();
 			const paymentStatus = (o.payment?.status as string | undefined) || 'unknown';
+			const methodOut = (String(o.deliveryType).toLowerCase() === 'pickup' && String(o.paymentMethod).toLowerCase() === 'cod') ? 'cash' : o.paymentMethod;
 			return [
 				when.toISOString(),
 				o.id,
@@ -442,7 +478,7 @@ export async function rebuildOrdersSheet(orders: Array<OrderLike & { payment?: a
 				o.tax,
 				o.discount,
 				o.total,
-				o.paymentMethod,
+				methodOut,
 				paymentStatus,
 				o.status || '',
 				'', // Driver placeholder

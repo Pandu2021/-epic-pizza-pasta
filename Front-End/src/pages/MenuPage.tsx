@@ -113,9 +113,11 @@ export default function MenuPage() {
 
   // Build a normalized searchable text for each item and filter by tokens
   const filtered = useMemo(() => {
-    if (!query) return menuItems;
+    // Filter out deprecated items like 'pizza-super-sampler'
+    const visibleItems = menuItems.filter((m) => m.id !== 'pizza-super-sampler');
+    if (!query) return visibleItems;
     const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return menuItems.filter((m) => {
+    return visibleItems.filter((m) => {
       const name = typeof m.name === 'object' ? (i18n.language === 'th' ? m.name.th : m.name.en) : (m.name ?? '');
       const desc = typeof m.description === 'object' ? (i18n.language === 'th' ? m.description.th : m.description.en) : (m.description ?? '');
       const hay = [m.id, m.category, name, desc].join(' ').toLowerCase();

@@ -70,6 +70,13 @@ export class OrdersPrintService {
       items: (order.items || []).map((it: any) => ({ name: it.nameSnapshot || String(it.menuItemId), qty: it.qty, price: it.priceSnapshot })),
       delivery: { type: (order.deliveryType === 'pickup' ? 'pickup' : 'delivery'), fee: Number(order.deliveryFee || 0) },
       paymentMethod: order.paymentMethod || 'cod',
+      // Pass-through pricing fields so PDF can render VAT/discount correctly
+      subtotal: typeof order.subtotal === 'number' ? order.subtotal : undefined,
+      deliveryFee: typeof order.deliveryFee === 'number' ? order.deliveryFee : undefined,
+      tax: typeof order.tax === 'number' ? order.tax : undefined,
+      discount: typeof order.discount === 'number' ? order.discount : undefined,
+      total: typeof order.total === 'number' ? order.total : undefined,
+      vatRate: typeof process.env.THAI_VAT_RATE === 'string' ? Number(process.env.THAI_VAT_RATE) : undefined,
     }
     return receipt
   }

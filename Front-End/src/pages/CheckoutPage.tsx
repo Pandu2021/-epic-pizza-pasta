@@ -15,19 +15,29 @@ const thPhone = z
     message: 'Please enter a valid Thai phone (0XXXXXXXXX or +66XXXXXXXXX)'
   });
 
-const schema = z.object({
-  name: z.string().min(1),
-  phone: thPhone,
-  address: z.string().min(5),
-  deliveryMethod: z.enum(['delivery', 'pickup']),
-  paymentMethod: z.enum(['promptpay', 'card', 'cod']).default('promptpay'),
-  // Basic card fields for test mode (Omise tokenization)
-  cardName: z.string().optional(),
-  cardNumber: z.string().optional(),
-  cardExpMonth: z.string().optional(),
-  cardExpYear: z.string().optional(),
-  cardCvc: z.string().optional(),
-});
+const schema = z
+  .object({
+    name: z.string().min(1),
+    phone: thPhone,
+    // Address required only when delivery
+    address: z.string().optional(),
+    deliveryMethod: z.enum(['delivery', 'pickup']),
+    paymentMethod: z.enum(['promptpay', 'card', 'cod']).default('promptpay'),
+    // Basic card fields for test mode (Omise tokenization)
+    cardName: z.string().optional(),
+    cardNumber: z.string().optional(),
+    cardExpMonth: z.string().optional(),
+    cardExpYear: z.string().optional(),
+    cardCvc: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.deliveryMethod === 'delivery') {
+      const addr = (data.address || '').trim();
+      if (!addr || addr.length < 5) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['address'], message: 'Address is required for delivery' });
+      }
+    }
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -91,7 +101,7 @@ export default function CheckoutPage() {
       setCreating(true);
       // 1) Create order in backend
       const payload = {
-        customer: { name: data.name.trim(), phone: data.phone.replace(/[\s-]/g,'') , address: data.address.trim() },
+        customer: { name: data.name.trim(), phone: data.phone.replace(/[\s-]/g,'') , address: (data.address || '').trim() || undefined },
         items: items.map((it) => ({ id: it.id, name: it.name, qty: Math.round(it.qty), price: Math.round(it.price), options: it.options ?? undefined })),
         delivery: { type: data.deliveryMethod, fee: data.deliveryMethod === 'delivery' ? 39 : 0 },
         paymentMethod: data.paymentMethod
@@ -275,8 +285,8 @@ export default function CheckoutPage() {
         {errors.name && <p className="text-red-600 text-sm">Name is required</p>}
   <input className="border rounded p-2 w-full" placeholder="Phone" type="tel" {...register('phone')} />
   {errors.phone && <p className="text-red-600 text-sm">{errors.phone.message || 'Valid Thai phone is required'}</p>}
-        <textarea className="border rounded p-2 w-full" placeholder="Address" {...register('address')} />
-        {errors.address && <p className="text-red-600 text-sm">Address is required</p>}
+  <textarea className="border rounded p-2 w-full" placeholder={deliveryMethod === 'pickup' ? 'Address (optional for pickup)' : 'Address'} {...register('address')} />
+  {errors.address && <p className="text-red-600 text-sm">{String(errors.address.message || 'Address is required for delivery')}</p>}
         <div className="flex gap-4">
           <label className="flex items-center gap-2">
             <input type="radio" value="delivery" {...register('deliveryMethod')} /> Delivery
@@ -294,7 +304,7 @@ export default function CheckoutPage() {
             <input type="radio" value="card" {...register('paymentMethod')} /> Card (Omise)
           </label>
           <label className="flex items-center gap-2">
-            <input type="radio" value="cod" {...register('paymentMethod')} /> Cash on Delivery (COD)
+            <input type="radio" value="cod" {...register('paymentMethod')} /> {deliveryMethod === 'pickup' ? 'Cash' : 'Cash on Delivery (COD)'}
           </label>
         </div>
 

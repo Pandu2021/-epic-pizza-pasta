@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 const HOURS = {
-  sun: '12:00 PM - 11:00 PM',
-  mon: '12:00 PM - 11:00 PM',
-  tue: '12:00 PM - 11:00 PM',
-  wed: '12:00 PM - 11:00 PM',
-  thu: '12:00 PM - 11:00 PM',
-  fri: '12:00 PM - 11:00 PM',
-  sat: '12:00 PM - 11:00 PM',
+  sun: '12:00 - 23:00',
+  mon: '12:00 - 23:00',
+  tue: '12:00 - 23:00',
+  wed: '12:00 - 23:00',
+  thu: '12:00 - 23:00',
+  fri: '12:00 - 23:00',
+  sat: '12:00 - 23:00',
 } as const;
 
 function getBangkokDay(): keyof typeof HOURS {
@@ -36,8 +36,8 @@ export default function Footer() {
     return h * 60 + m;
   };
   const nowMin = getBangkokMinutesNow();
-  const openMin = 12 * 60; // 12:00 PM
-  const closeMin = 23 * 60; // 11:00 PM
+  const openMin = 12 * 60; // 12:00 (24-hour)
+  const closeMin = 23 * 60; // 23:00 (24-hour)
   const isOpenNow = nowMin >= openMin && nowMin < closeMin;
   return (
     <footer className="mt-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100">
@@ -116,7 +116,7 @@ export default function Footer() {
               </div>
 
               <div className="text-slate-300">{t('sun_to_sat')}</div>
-              <div className="text-slate-100">12:00 PM - 11:00 PM</div>
+              <div className="text-slate-100">12:00 - 23:00</div>
             </div>
           </div>
         </div>

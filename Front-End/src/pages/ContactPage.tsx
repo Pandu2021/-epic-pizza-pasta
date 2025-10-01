@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 const ADDRESS = '1, 15 Soi Nonthaburi, Bang Krasor, Nonthaburi 11000, Thailand';
 const PHONE = '+66 95 569 7525';
 const EMAIL = 'epicpizzaandpasta@gmail.com';
+const LINE_HANDLE = '@epicpizzapasta';
+const LINE_LINK = 'https://page.line.me/epicpizzapasta';
 
 function getBangkokMinutesNow() {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -36,8 +38,8 @@ function getBangkokWeekdayKey(): 'sunday' | 'monday' | 'tuesday' | 'wednesday' |
 export default function ContactPage() {
   const { t } = useTranslation();
   const nowMin = getBangkokMinutesNow();
-  const openMin = 12 * 60; // 12:00 PM
-  const closeMin = 23 * 60; // 11:00 PM
+  const openMin = 12 * 60; // 12:00 (24-hour)
+  const closeMin = 23 * 60; // 23:00 (24-hour)
   const isOpenNow = nowMin >= openMin && nowMin < closeMin;
   const weekdayKey = getBangkokWeekdayKey();
   const weekOrder: typeof weekdayKey[] = [
@@ -93,6 +95,16 @@ export default function ContactPage() {
                   <div className="font-medium">{EMAIL}</div>
                 </div>
               </a>
+              <a href={LINE_LINK} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 p-4 rounded-lg hover:bg-slate-50 transition">
+                <svg aria-hidden="true" viewBox="0 0 48 48" className="h-7 w-7" role="img">
+                  <rect x="0" y="0" width="48" height="48" rx="10" fill="#06C755" />
+                  <text x="50%" y="56%" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="18" fill="#ffffff">LINE</text>
+                </svg>
+                <div>
+                  <div className="text-sm text-slate-500">LINE</div>
+                  <div className="font-medium">{LINE_HANDLE}</div>
+                </div>
+              </a>
               <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 p-4 rounded-lg hover:bg-slate-50 transition sm:col-span-2">
                 <MapPinIcon className="h-6 w-6 text-brand-primary" />
                 <div>
@@ -125,7 +137,7 @@ export default function ContactPage() {
             <div className="mt-4 flex items-center justify-between">
               <div className="text-slate-500">{t('today')} ({t(`days.${weekdayKey}`)})</div>
               <div className="flex items-center gap-2 font-medium">
-                12:00 PM - 11:00 PM
+                12:00 - 23:00
                 <span className={`chip border ${isOpenNow ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-700' : 'bg-rose-500/20 border-rose-400/30 text-rose-700'}`}>
                   {isOpenNow ? t('open') : t('closed')}
                 </span>
@@ -140,7 +152,7 @@ export default function ContactPage() {
                       {t(`days.${d}`)}
                     </div>
                     <div key={`${d}-hours`} className={isToday ? 'text-slate-900 font-medium' : undefined}>
-                      12:00 PM - 11:00 PM
+                      12:00 - 23:00
                     </div>
                   </>
                 );

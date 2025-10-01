@@ -18,6 +18,13 @@ export type OrderReceipt = {
   delivery: { type: 'pickup' | 'delivery'; fee: number }
   paymentMethod: 'cod' | 'promptpay' | 'card' | string
   notes?: string
+  // Optional pricing fields (if provided by caller we will render them directly)
+  subtotal?: number
+  deliveryFee?: number
+  tax?: number
+  discount?: number
+  total?: number
+  vatRate?: number
 }
 
 const mm = (val: number) => (val * 72) / 25.4 // mm -> points
@@ -52,8 +59,13 @@ export async function generateA6ReceiptPdf(order: OrderReceipt): Promise<string>
   }
 
   const nowISO = order.dateISO || new Date().toISOString()
-  const subtotal = order.items.reduce((s, it) => s + it.qty * it.price, 0)
-  const total = subtotal + (order.delivery?.fee || 0)
+  const providedVatRate = typeof order.vatRate === 'number' ? order.vatRate : Number(process.env.THAI_VAT_RATE || 0.07)
+  const computedSubtotal = order.items.reduce((s, it) => s + it.qty * it.price, 0)
+  const subtotal = typeof order.subtotal === 'number' ? order.subtotal : computedSubtotal
+  const deliveryFee = typeof order.deliveryFee === 'number' ? order.deliveryFee : (order.delivery?.fee || 0)
+  const discount = typeof order.discount === 'number' ? order.discount : 0
+  const tax = typeof order.tax === 'number' ? order.tax : Math.round((subtotal + deliveryFee - discount) * providedVatRate)
+  const total = typeof order.total === 'number' ? order.total : subtotal + deliveryFee + tax - discount
 
   // Header
   doc.fontSize(16).text('Pizza & Pasta', { align: 'center' })
@@ -92,9 +104,18 @@ export async function generateA6ReceiptPdf(order: OrderReceipt): Promise<string>
   doc.fontSize(10)
   doc.text('Subtotal', { continued: true })
   doc.text(currencyTHB(subtotal), { align: 'right' })
-  if (order.delivery.fee) {
+  if (deliveryFee) {
     doc.text('Delivery', { continued: true })
-    doc.text(currencyTHB(order.delivery.fee), { align: 'right' })
+    doc.text(currencyTHB(deliveryFee), { align: 'right' })
+  }
+  if (tax) {
+    const ratePct = Math.round((providedVatRate || 0) * 100)
+    doc.text(`VAT ${ratePct}%`, { continued: true })
+    doc.text(currencyTHB(tax), { align: 'right' })
+  }
+  if (discount) {
+    doc.text('Discount', { continued: true })
+    doc.text(`- ${currencyTHB(discount)}`, { align: 'right' })
   }
   doc.fontSize(12).text('TOTAL', { continued: true })
   doc.fontSize(12).text(currencyTHB(total), { align: 'right' })

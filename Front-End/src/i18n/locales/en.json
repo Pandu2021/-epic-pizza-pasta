@@ -131,7 +131,10 @@
     "add_extras": "Add extras",
     "extras": {
       "extra-cheese": "Extra Cheese",
-      "garlic-butter": "Garlic Butter"
+      "garlic-butter": "Garlic Butter",
+      "pasta-garlic-chicken": "Garlic Chicken",
+      "pasta-shrimp-scampi-3": "Shrimp Scampi (3 pcs)",
+      "pasta-crispy-bacon": "Crispy Bacon"
     },
     "notes_label": "Notes (allergies, remove toppings, etc.)",
     "notes_placeholder": "Any special requests?",

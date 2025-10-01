@@ -4,9 +4,13 @@ import { URL } from 'node:url';
 import { verifyWebhookSignature } from '../utils/webhook';
 import { buildPromptPayPayload } from '../utils/promptpay';
 import { prisma } from '../prisma';
+import { OrdersPrintService } from '../orders/orders.print';
+import { sendEmail } from '../utils/email';
+import { enqueue } from '../utils/job-queue';
 
 @Controller('api')
 export class PaymentsController {
+  constructor(private readonly printer: OrdersPrintService) {}
   // Generate PromptPay QR via local EMVCo builder (legacy)
   @Post('payments/promptpay/create')
   async createPromptPay(@Body() body: { orderId: string; amount: number }) {
@@ -245,6 +249,36 @@ export class PaymentsController {
         create: { orderId: order.id, method: 'card', status: 'paid', providerRefId: chargeId, paidAt: new Date() },
       });
       await prisma.order.update({ where: { id: order.id }, data: { status: 'preparing' } });
+
+      // Enqueue receipt email with PDF (synchronous charge path)
+      const orderIdToEmail = order.id;
+      enqueue({
+        id: `email:receipt:after-paid:${orderIdToEmail}`,
+        run: async () => {
+          try {
+            const filePath = await this.printer.generateReceipt(orderIdToEmail);
+            // Try to find a user email: check order.userId then phone
+            const ord = await prisma.order.findUnique({ where: { id: orderIdToEmail }, select: { phone: true, userId: true } });
+            let to = process.env.RECEIPT_EMAIL_TO || 'epicpizzaorders@gmail.com';
+            if (ord?.userId) {
+              const user = await prisma.user.findUnique({ where: { id: ord.userId }, select: { email: true } });
+              if (user?.email) to = user.email;
+            } else if (ord?.phone) {
+              const user = await prisma.user.findFirst({ where: { phone: ord.phone }, select: { email: true } });
+              if (user?.email) to = user.email;
+            }
+            const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+            const filename = `receipt-${String(orderIdToEmail).slice(0,8)}-${ts}.pdf`;
+            const subject = `Receipt ${orderIdToEmail}`;
+            const html = `<p>Attached is the receipt for order <b>${orderIdToEmail}</b>. Thank you for your payment.</p>`;
+            await sendEmail({ to, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
+          } catch (e) {
+            // non-fatal
+          }
+        },
+        maxRetries: 3,
+        baseDelayMs: 1000,
+      });
     }
 
     return { ok: paid, chargeId, status };
@@ -319,6 +353,33 @@ export class PaymentsController {
               data: { status: 'paid', paidAt: new Date(), providerRefId: chargeId || payment.providerRefId },
             });
             await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'preparing' } });
+
+            // Enqueue receipt email with PDF
+            const orderIdToEmail = payment.orderId;
+            enqueue({
+              id: `email:receipt:after-paid:${orderIdToEmail}`,
+              run: async () => {
+                try {
+                  const filePath = await this.printer.generateReceipt(orderIdToEmail);
+                  const toCandidate = (await prisma.order.findUnique({ where: { id: orderIdToEmail }, select: { phone: true } }))?.phone;
+                  // Try to find a user email if phone linked to user
+                  let to = process.env.RECEIPT_EMAIL_TO || 'epicpizzaorders@gmail.com';
+                  if (toCandidate) {
+                    const user = await prisma.user.findFirst({ where: { phone: toCandidate }, select: { email: true } });
+                    if (user?.email) to = user.email;
+                  }
+                  const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+                  const filename = `receipt-${String(orderIdToEmail).slice(0,8)}-${ts}.pdf`;
+                  const subject = `Receipt ${orderIdToEmail}`;
+                  const html = `<p>Attached is the receipt for order <b>${orderIdToEmail}</b>. Thank you for your payment.</p>`;
+                  await sendEmail({ to, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
+                } catch (e) {
+                  // non-fatal
+                }
+              },
+              maxRetries: 3,
+              baseDelayMs: 1000,
+            });
           }
         }
       }
@@ -347,6 +408,35 @@ export class PaymentsController {
         data: { status: 'paid', providerRefId: payload.providerRefId, paidAt: new Date() },
       });
       await prisma.order.update({ where: { id: payload.orderId }, data: { status: 'preparing' } });
+
+      // Enqueue receipt email with PDF
+      enqueue({
+        id: `email:receipt:after-paid:${payload.orderId}`,
+        run: async () => {
+          try {
+            const filePath = await this.printer.generateReceipt(payload.orderId);
+            // Try to get user email by associated user or phone
+            const order = await prisma.order.findUnique({ where: { id: payload.orderId }, select: { phone: true, userId: true } });
+            let to = process.env.RECEIPT_EMAIL_TO || 'epicpizzaorders@gmail.com';
+            if (order?.userId) {
+              const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { email: true } });
+              if (user?.email) to = user.email;
+            } else if (order?.phone) {
+              const user = await prisma.user.findFirst({ where: { phone: order.phone }, select: { email: true } });
+              if (user?.email) to = user.email;
+            }
+            const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+            const filename = `receipt-${String(payload.orderId).slice(0,8)}-${ts}.pdf`;
+            const subject = `Receipt ${payload.orderId}`;
+            const html = `<p>Attached is the receipt for order <b>${payload.orderId}</b>. Thank you for your payment.</p>`;
+            await sendEmail({ to, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
+          } catch (e) {
+            // non-fatal
+          }
+        },
+        maxRetries: 3,
+        baseDelayMs: 1000,
+      });
     }
 
     return { ok: true };

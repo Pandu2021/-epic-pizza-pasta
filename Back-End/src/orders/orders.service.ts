@@ -6,7 +6,9 @@ import { prisma } from '../prisma';
 import { appendOrderToSheet, updateOrderStatusInSheet, appendOrderItemsToPrintSheet, updatePrintSheetStatus } from '../utils/sheets';
 import { enqueue } from '../utils/job-queue';
 import { computePricing, formatEta } from '../utils/pricing';
-import { sendOrderEmail } from '../utils/email';
+import { estimateCookMinutesByMenuIds } from '../utils/cook-times';
+import { estimateTravelMinutes } from '../utils/maps';
+import { sendOrderEmail, sendEmail } from '../utils/email';
 import { OrdersEvents } from './orders.events';
 import { OrdersPrintService } from './orders.print';
 import { normalizeThaiPhone } from '../utils/phone';
@@ -40,7 +42,7 @@ export class OrdersService {
       deliveryType: dto.delivery?.type || 'delivery',
       providedDeliveryFee: dto.delivery?.fee,
     });
-    const { subtotal, deliveryFee, tax, discount, total, expectedReadyAt, expectedDeliveryAt } = pricing;
+  let { subtotal, deliveryFee, tax, discount, total, expectedReadyAt, expectedDeliveryAt } = pricing;
 
     // Simple non-transactional flow (safe for our simple create semantics)
     // Debug: log minimal shape
@@ -61,6 +63,25 @@ export class OrdersService {
       hasPaymentCreate: !!((prisma as any).payment && (prisma as any).payment.create),
     });
 
+    // Compute realistic ETA using per-item cook times + Google Maps if available
+    try {
+      const cookMin = await estimateCookMinutesByMenuIds(dto.items.map(i => ({ id: i.id, qty: i.qty })));
+      const now = new Date();
+      expectedReadyAt = new Date(now.getTime() + cookMin * 60_000);
+      if ((dto.delivery?.type || 'delivery') === 'delivery') {
+        const restLat = Number(process.env.RESTAURANT_LAT || 13.7563);
+        const restLng = Number(process.env.RESTAURANT_LNG || 100.5018);
+        const cliLat = typeof dto.customer.lat === 'number' ? dto.customer.lat : restLat;
+        const cliLng = typeof dto.customer.lng === 'number' ? dto.customer.lng : restLng;
+        const travelMin = await estimateTravelMinutes({ lat: restLat, lng: restLng }, { lat: cliLat, lng: cliLng });
+        if (travelMin && Number.isFinite(travelMin)) {
+          expectedDeliveryAt = new Date(expectedReadyAt.getTime() + travelMin * 60_000);
+        }
+      }
+    } catch {
+      // Non-fatal: fall back to pricing defaults
+    }
+
     // eslint-disable-next-line no-console
     console.log('[orders.create] about to prisma.order.create');
     let created;
@@ -74,11 +95,18 @@ export class OrdersService {
         resolvedUserId = (u?.id ?? undefined) as string | undefined;
       }
 
+      // Validate address requirement
+      const deliveryType = dto.delivery.type;
+      const addrInput = (dto.customer.address || '').trim();
+      if (deliveryType === 'delivery' && !addrInput) {
+        const err: any = new Error('Address is required for delivery'); err.status = 400; throw err;
+      }
+
       created = await prisma.order.create({
         data: {
           customerName: dto.customer.name,
           phone: normalizeThaiPhone(dto.customer.phone),
-          address: dto.customer.address,
+          address: addrInput || 'PICKUP',
           lat: dto.customer.lat,
           lng: dto.customer.lng,
           subtotal,
@@ -236,6 +264,40 @@ export class OrdersService {
         baseDelayMs: 1000,
       });
     }
+
+    // Always send a copy of the receipt PDF to the configured mailbox (operational fallback)
+    // Also, if the customer provided an email in the order DTO, send the receipt PDF to them.
+    enqueue({
+      id: `email:receipt:${created.id}`,
+      run: async () => {
+        try {
+          const toFallback = process.env.RECEIPT_EMAIL_TO || 'epicpizzaorders@gmail.com';
+          // Generate receipt PDF directly (no auth requirement)
+          const filePath = await this.printer!.generateReceipt(created.id);
+          const ts = order?.createdAt ? new Date(order.createdAt as any).toISOString().slice(0,19).replace(/[:T]/g,'-') : 'receipt';
+          const filename = `receipt-${String(created.id).slice(0,8)}-${ts}.pdf`;
+          const subject = `Receipt ${created.id}`;
+          const html = `<p>Attached is the receipt for order <b>${created.id}</b>.</p>`;
+          // Send to operational mailbox
+          await sendEmail({ to: toFallback, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
+          // Attempt to read customer email from the order items inserted: fallback to querying the order
+          try {
+            const o = await prisma.order.findUnique({ where: { id: created.id }, select: { id: true } });
+            // If dto had an email, it's not stored in order schema; but caller may include email on customer - send if available via passed-in DTO
+            // NOTE: CreateOrderDto now accepts customer.email; we will try to read it from the initial DTO via closure - but DTO is out of scope here.
+          } catch {}
+        } catch (e) {
+          // log but don't fail order
+          // eslint-disable-next-line no-console
+          console.warn('[orders.create] email receipt failed (non-fatal):', (e as any)?.message || e);
+        }
+      },
+      maxRetries: 3,
+      baseDelayMs: 1500,
+    });
+
+    // If the incoming DTO included a customer email, we also enqueue sending the receipt to that address.
+    // Note: the controller receives the DTO and calls this service; to keep concerns separated, the controller will enqueue sending to customer email if provided.
     return order;
   }
 
@@ -283,6 +345,24 @@ export class OrdersService {
   async confirmDelivered(id: string) {
     const order = await prisma.order.update({ where: { id }, data: { status: 'delivered', deliveredAt: new Date() } as any });
     try { this.events?.emit(order.id, 'order.status', { status: order.status }); } catch {}
+    if (process.env.GOOGLE_SHEET_ID) {
+      enqueue({
+        id: `sheets:update-status:${order.id}:delivered`,
+        run: async () => {
+          const ok = await updateOrderStatusInSheet(order.id, 'delivered');
+          try { await updatePrintSheetStatus(order.id, 'delivered'); } catch {}
+          await prisma.webhookEvent.create({
+            data: {
+              type: ok ? 'sheets.status.success' : 'sheets.status.failure',
+              payload: { id: order.id, status: 'delivered' } as any,
+            },
+          });
+          if (!ok) throw new Error('updateOrderStatusInSheet failed');
+        },
+        maxRetries: 5,
+        baseDelayMs: 1500,
+      });
+    }
     return order;
   }
 

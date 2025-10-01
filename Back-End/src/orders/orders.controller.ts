@@ -8,6 +8,7 @@ import { Request } from 'express';
 import { auth } from '../auth/auth.service';
 import fs from 'node:fs'
 import path from 'node:path'
+import { sendEmail } from '../utils/email'
 
 @Controller('api/orders')
 export class OrdersController {
@@ -29,6 +30,29 @@ export class OrdersController {
     try {
       const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
       const order = await this.orders.create(dto, userId);
+      // If customer provided an email in the order DTO, enqueue sending receipt PDF to them.
+      try {
+        const custEmail = (dto as any)?.customer?.email as string | undefined;
+        const orderIdForEmail = order?.id
+        if (custEmail && orderIdForEmail) {
+          // Fire-and-forget: generate PDF and email to customer (best-effort)
+          (async () => {
+            try {
+              const { filePath } = await this.orders.generateReceiptForDownload(orderIdForEmail, (req as any).user?.id || '');
+              const ts = order?.createdAt ? new Date(order.createdAt as any).toISOString().slice(0,19).replace(/[:T]/g,'-') : 'receipt';
+              const filename = `receipt-${String(orderIdForEmail).slice(0,8)}-${ts}.pdf`;
+              const subject = `Pesanan Anda diterima - ${orderIdForEmail}`;
+              const html = `<p>Terima kasih! Terlampir adalah bukti pesanan Anda (Order <b>${orderIdForEmail}</b>).</p>`;
+              await sendEmail({ to: custEmail, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[orders.controller] failed to email receipt to customer (non-fatal):', (e as any)?.message || e);
+            }
+          })()
+        }
+      } catch (e) {
+        // swallow errors
+      }
       return {
         orderId: order?.id,
         status: order?.status,
@@ -131,6 +155,25 @@ export class OrdersController {
       const msg = e?.message || 'Failed to generate receipt';
       const status = e?.status || HttpStatus.BAD_REQUEST;
       throw new HttpException({ message: msg }, status);
+    }
+  }
+
+  // Email receipt as PDF attachment to a target email (defaults to epicpizzaorders@gmail.com)
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/email-receipt')
+  async emailReceipt(@Param('id') id: string, @Req() req: Request, @Body() body: { to?: string }) {
+    try {
+      const userId = (req as any).user?.id as string
+      const { filePath, filename } = await this.orders.generateReceiptForDownload(id, userId)
+      const to = body?.to || process.env.RECEIPT_EMAIL_TO || 'epicpizzaorders@gmail.com'
+      const subject = `Receipt ${id}`
+      const html = `<p>Attached is the receipt for order <b>${id}</b>.</p>`
+      await sendEmail({ to, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] })
+      return { ok: true, to }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to email receipt'
+      const status = e?.status || HttpStatus.BAD_REQUEST
+      throw new HttpException({ message: msg }, status)
     }
   }
 

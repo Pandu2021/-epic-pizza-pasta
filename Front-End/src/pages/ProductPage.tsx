@@ -9,16 +9,27 @@ import { CheckIcon, PlusIcon, MinusIcon } from '@heroicons/react/24/solid';
 
 // Define the type for an extra item
 type Extra = {
-  id: 'extra-cheese' | 'garlic-butter';
-  name: string;
+  id:
+    | 'extra-cheese'
+    | 'garlic-butter'
+    | 'pasta-garlic-chicken'
+    | 'pasta-shrimp-scampi-3'
+    | 'pasta-crispy-bacon';
+  name: string; // i18n key under product.extras.*
   price: number | { L: number; XL: number }; // Price can be a number or an object for size-dependent pricing
   icon: string;
 };
 
-// Define the extras based on the menu
-const extras: Extra[] = [
+// Define extras for pizzas and pasta separately
+const pizzaExtras: Extra[] = [
   { id: 'extra-cheese', name: 'product.extras.extra-cheese', price: { L: 39, XL: 50 }, icon: '🧀' },
   { id: 'garlic-butter', name: 'product.extras.garlic-butter', price: 10, icon: '🧈' },
+];
+
+const pastaExtras: Extra[] = [
+  { id: 'pasta-garlic-chicken', name: 'product.extras.pasta-garlic-chicken', price: 45, icon: '🍗' },
+  { id: 'pasta-shrimp-scampi-3', name: 'product.extras.pasta-shrimp-scampi-3', price: 79, icon: '🦐' },
+  { id: 'pasta-crispy-bacon', name: 'product.extras.pasta-crispy-bacon', price: 49, icon: '🥓' },
 ];
 
 export default function ProductPage() {
@@ -54,20 +65,20 @@ export default function ProductPage() {
 
   // A pizza item is identified by having size-based prices (priceL / priceXL)
   const isPizza = useMemo(() => !!(item && (item.priceL || item.priceXL)), [item]);
+  const isPasta = useMemo(() => item?.category === 'pasta', [item]);
   // Normalize base price for non-pizza (DB uses basePrice; JSON fallback may have price)
   const normalizedBasePrice = useMemo(() => {
     if (!item) return 0;
     if (isPizza) return 0; // pizzas handled separately with priceL/priceXL logic below
     return item.basePrice ?? item.price ?? 0; // production DB returns basePrice, JSON fallback has price
   }, [item, isPizza]);
-  const [size, setSize] = useState<'L' | 'XL'>('L');
+  const [size, setSize] = useState<'L' | 'XL'>('XL');
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
   const [qty, setQty] = useState<number>(1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [notes, setNotes] = useState<string>('');
 
   // Flavor selection state
-  const isSuperSampler = useMemo(() => item?.id === 'pizza-super-sampler', [item]);
   // singleFlavorId is used when not split; for 50/50 we use halfA/halfB; for sampler we use up to 4
   const [splitMode, setSplitMode] = useState<'single' | 'half' | 'sampler'>('single');
   const [halfA, setHalfA] = useState<string | null>(null);
@@ -85,21 +96,16 @@ export default function ProductPage() {
     return Array.from(map.values());
   }, [allPizzas, item]);
 
-  // Set default size when item is loaded and is a pizza; prefer L if available else XL
+  // Set default size when item is loaded and is a pizza; default to XL for clarity
   useEffect(() => {
     if (!item) return;
     if (!isPizza) return;
-    if (item.priceL != null) setSize('L'); else if (item.priceXL != null) setSize('XL');
+    if (item.priceXL != null) setSize('XL'); else if (item.priceL != null) setSize('L');
     // Set split defaults
-    if (item.id === 'pizza-super-sampler') {
-      setSplitMode('sampler');
-      setSize('XL'); // enforce XL
-    } else {
-      setSplitMode('single');
-      setHalfA(item.id);
-      setHalfB(null);
-      setSamplerFlavors([]);
-    }
+    setSplitMode('single');
+    setHalfA(item.id);
+    setHalfB(null);
+    setSamplerFlavors([]);
   }, [item, isPizza]);
 
   const handleToggleExtra = (extra: Extra) => {
@@ -109,6 +115,8 @@ export default function ProductPage() {
         : [...prev, extra]
     );
   };
+
+  const availableExtras: Extra[] = isPizza ? pizzaExtras : (isPasta ? pastaExtras : []);
 
   const extrasPrice = useMemo(() => {
     return selectedExtras.reduce((acc, extra) => {
@@ -127,13 +135,10 @@ export default function ProductPage() {
     return sz === 'XL' ? (p.priceXL ?? 0) : (p.priceL ?? 0);
   };
 
+  const SAMPLER_PRICE_XL = 550; // XL-only sampler flat price
   const basePrice = useMemo(() => {
     if (!item) return 0;
     if (!isPizza) return normalizedBasePrice;
-    if (isSuperSampler) {
-      // Flat price XL only
-      return item.priceXL ?? getPizzaPrice(item.id, 'XL');
-    }
     if (splitMode === 'single') {
       return getPizzaPrice(halfA || item.id, size);
     }
@@ -143,8 +148,12 @@ export default function ProductPage() {
       const b = getPizzaPrice(halfB || item.id, size);
       return Math.max(a, b);
     }
+    if (splitMode === 'sampler') {
+      // Sampler is XL only at a flat price
+      return SAMPLER_PRICE_XL;
+    }
     return getPizzaPrice(item.id, size);
-  }, [item, isPizza, isSuperSampler, splitMode, size, halfA, halfB, allPizzas, normalizedBasePrice]);
+  }, [item, isPizza, splitMode, size, halfA, halfB, allPizzas, normalizedBasePrice]);
 
   const totalPrice = (basePrice + extrasPrice) * qty;
 
@@ -157,7 +166,7 @@ export default function ProductPage() {
     let flavorsLabel = '';
     let options: Record<string, unknown> | undefined = undefined;
     if (isPizza) {
-      if (isSuperSampler) {
+      if (splitMode === 'sampler') {
         const names = samplerFlavors.map((fid) => {
           const p = fid === item.id ? item : allPizzas.find((m) => m.id === fid);
           const nm = p ? (typeof p.name === 'object' ? t(p.name) : (p.name ?? '')) : fid;
@@ -272,9 +281,9 @@ export default function ProductPage() {
                   animate={size === 'L' ? { scale: 1.05 } : { scale: 1 }}
                   className={`flex-1 text-center p-4 rounded-lg border-2 transition-colors ${size === 'L' ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
                   onClick={() => setSize('L')}
-                  disabled={isSuperSampler}
+                  disabled={splitMode === 'sampler'}
                 >
-                  <div className="text-xl font-bold">L</div>
+                  <div className="text-xl font-bold">L - 10"</div>
                   <div className="text-sm">฿ {item.priceL.toFixed(0)}</div>
                 </motion.button>
               )}
@@ -285,7 +294,7 @@ export default function ProductPage() {
                   className={`flex-1 text-center p-4 rounded-lg border-2 transition-colors ${size === 'XL' ? 'border-brand-primary bg-brand-primary/10' : 'border-slate-300'}`}
                   onClick={() => setSize('XL')}
                 >
-                  <div className="text-xl font-bold">XL</div>
+                  <div className="text-xl font-bold">XL - 15"</div>
                   <div className="text-sm">฿ {(item.priceXL ?? 0).toFixed(0)}</div>
                 </motion.button>
               )}
@@ -294,7 +303,7 @@ export default function ProductPage() {
         )}
 
         {/* Flavor selection for pizzas */}
-        {isPizza && !isSuperSampler && (
+        {isPizza && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">{translate('product.choose_flavors')}</h3>
             <div className="flex gap-2">
@@ -315,6 +324,16 @@ export default function ProductPage() {
                 onClick={() => setSplitMode('half')}
               >
                 {translate('product.half_half')}
+              </button>
+              <button
+                type="button"
+                className={`btn-outline ${splitMode === 'sampler' ? 'bg-slate-100' : ''}`}
+                onClick={() => {
+                  setSplitMode('sampler');
+                  setSize('XL'); // enforce XL for sampler
+                }}
+              >
+                {translate('product.super_sampler_title')}
               </button>
             </div>
 
@@ -362,8 +381,8 @@ export default function ProductPage() {
           </div>
         )}
 
-        {/* Super Sampler (XL only) */}
-        {isSuperSampler && (
+        {/* Sampler (XL only) */}
+        {isPizza && splitMode === 'sampler' && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-2">{translate('product.super_sampler_title')}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -393,12 +412,12 @@ export default function ProductPage() {
           </div>
         )}
 
-        {/* Extras Options (Only for Pizzas) */}
-        {isPizza && (
+        {/* Extras Options (Pizzas and Pasta) */}
+        {(isPizza || isPasta) && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">{translate('product.add_extras')}</h3>
             <div className="space-y-3">
-              {extras.map(extra => (
+              {availableExtras.map(extra => (
                 <motion.div
                   key={extra.id}
                   onClick={() => handleToggleExtra(extra)}
@@ -467,7 +486,7 @@ export default function ProductPage() {
             disabled={
               addedToCart || !item ||
               (isPizza && splitMode === 'half' && (!halfA || !halfB)) ||
-              (isSuperSampler && samplerFlavors.length === 0)
+              (isPizza && splitMode === 'sampler' && samplerFlavors.length === 0)
             }
             whileTap={{ scale: 0.95 }}
           >
