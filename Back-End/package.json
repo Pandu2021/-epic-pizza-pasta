@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "prestart:prod": "npm run prisma:generate",
     "start:prod": "node dist/main.js",
-    "start:render": "npm run prisma:deploy && node -e \"if (process.env.SEED_ON_START !== 'false') { require('child_process').execSync('npm run seed:menu', { stdio: 'inherit' }); }\" && node dist/main.js",
+  "start:render": "node scripts/start-render.js",
     "start:dev": "tsx watch src/main.ts",
     "start:debug": "node --inspect dist/main.js",
     "lint": "eslint .",
