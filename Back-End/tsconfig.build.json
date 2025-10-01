@@ -3,7 +3,9 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src"
   },
-  "exclude": ["prisma/seed/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["prisma/seed/**/*", "scripts/**/*", "dist"]
 }
