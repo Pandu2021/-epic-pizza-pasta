@@ -85,6 +85,15 @@ export default function ProductPage() {
   const [halfB, setHalfB] = useState<string | null>(null);
   const [samplerFlavors, setSamplerFlavors] = useState<string[]>([]);
 
+  const splitModeButtonClass = (active: boolean) =>
+    [
+      'group btn flex-1 relative overflow-hidden border-2 px-4 py-3 text-sm font-semibold transition-all duration-200',
+      active
+        ? 'border-brand-primary bg-brand-primary/10 text-brand-primary shadow-sm'
+        : 'border-slate-300 text-slate-600 hover:border-brand-primary/60 hover:text-brand-primary/80',
+      'rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/50 focus-visible:ring-offset-2'
+    ].join(' ');
+
   // Build unique pizza options (exclude Super Sampler), ensure current item is included once at the top
   const pizzaOptions = useMemo(() => {
     const arr = (allPizzas || []).filter((p) => p.id !== 'pizza-super-sampler');
@@ -309,31 +318,52 @@ export default function ProductPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`btn-outline ${splitMode === 'single' ? 'bg-slate-100' : ''}`}
+                className={splitModeButtonClass(splitMode === 'single')}
+                aria-pressed={splitMode === 'single'}
                 onClick={() => {
                   setSplitMode('single');
                   // Single flavor must follow the current product
                   setHalfA(item.id);
                 }}
               >
-                {translate('product.single_flavor')}
+                <span className="relative z-10">{translate('product.single_flavor')}</span>
+                <span
+                  aria-hidden
+                  className={`pointer-events-none absolute left-3 right-3 bottom-1 h-1 rounded-full transition-colors duration-200 ${
+                    splitMode === 'single' ? 'bg-brand-primary' : 'bg-transparent group-hover:bg-brand-primary/30'
+                  }`}
+                />
               </button>
               <button
                 type="button"
-                className={`btn-outline ${splitMode === 'half' ? 'bg-slate-100' : ''}`}
+                className={splitModeButtonClass(splitMode === 'half')}
+                aria-pressed={splitMode === 'half'}
                 onClick={() => setSplitMode('half')}
               >
-                {translate('product.half_half')}
+                <span className="relative z-10">{translate('product.half_half')}</span>
+                <span
+                  aria-hidden
+                  className={`pointer-events-none absolute left-3 right-3 bottom-1 h-1 rounded-full transition-colors duration-200 ${
+                    splitMode === 'half' ? 'bg-brand-primary' : 'bg-transparent group-hover:bg-brand-primary/30'
+                  }`}
+                />
               </button>
               <button
                 type="button"
-                className={`btn-outline ${splitMode === 'sampler' ? 'bg-slate-100' : ''}`}
+                className={splitModeButtonClass(splitMode === 'sampler')}
+                aria-pressed={splitMode === 'sampler'}
                 onClick={() => {
                   setSplitMode('sampler');
                   setSize('XL'); // enforce XL for sampler
                 }}
               >
-                {translate('product.super_sampler_title')}
+                <span className="relative z-10">{translate('product.super_sampler_title')}</span>
+                <span
+                  aria-hidden
+                  className={`pointer-events-none absolute left-3 right-3 bottom-1 h-1 rounded-full transition-colors duration-200 ${
+                    splitMode === 'sampler' ? 'bg-brand-primary' : 'bg-transparent group-hover:bg-brand-primary/30'
+                  }`}
+                />
               </button>
             </div>
 
