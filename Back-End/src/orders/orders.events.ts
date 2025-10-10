@@ -43,8 +43,7 @@ export class OrdersEvents {
 }
 
 function reqOnClose(res: Response, cb: () => void) {
-  // @ts-ignore
-  const req = res.req as import('express').Request | undefined;
+  const req = (res as Response & { req?: import('express').Request }).req;
   if (!req) return;
   const done = () => cb();
   req.on('close', done);

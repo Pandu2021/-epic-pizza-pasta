@@ -10,7 +10,7 @@ import pinoHttp from 'pino-http';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import csrf from 'csurf';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import * as express from 'express';
 import crypto from 'crypto';
@@ -40,16 +40,19 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: false, limit: process.env.BODY_LIMIT || '200kb' }));
   app.use(cookieParser(process.env.COOKIE_SECRET));
   // Attach a request id and structured logger
-  app.use((req: any, _res: Response, next: NextFunction) => {
+  app.use((req: Request & { id?: string }, res: Response, next: NextFunction) => {
     req.id = req.id || cryptoRandomId();
+    if (!res.headersSent) {
+      res.setHeader('X-Request-Id', req.id);
+    }
     next();
   });
   const enableHttpLog = process.env.HTTP_LOG !== 'false';
   if (enableHttpLog) {
     app.use(pinoHttp({
-      genReqId: (req: any) => req.id || cryptoRandomId(),
+      genReqId: (req: Request & { id?: string }) => req.id || cryptoRandomId(),
       autoLogging: true,
-      customProps: (req: any) => ({ reqId: req.id }),
+      customProps: (req: Request & { id?: string }) => ({ reqId: req.id }),
     }));
     app.use(morgan('combined'));
   }
@@ -104,7 +107,7 @@ async function bootstrap() {
         }
       }
       const message = msgs.filter(Boolean).join('; ') || 'Validation failed';
-      return new (require('@nestjs/common').BadRequestException)(message);
+      return new BadRequestException(message);
     },
   }));
 
@@ -135,6 +138,7 @@ async function bootstrap() {
       '/api/auth/refresh',
       '/api/auth/logout',
       '/api/auth/forgot-password',
+  '/api/auth/reset-password',
       // Webhooks should not use CSRF, they are authenticated differently
       '/api/webhooks/promptpay',
       '/api/webhooks/omise',

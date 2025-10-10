@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { endpoints } from '../services/api';
 
-export type AuthUser = { id: string; email: string; name?: string; role?: string; phone?: string };
+export type AuthUser = { id: string; email: string; name?: string; role?: string; phone?: string; lineUserId?: string };
 
 type AuthState = {
   user: AuthUser | null;
@@ -26,7 +26,7 @@ export const useAuth = create<AuthState>()(
           const res = await endpoints.me();
           const user = (res.data?.user || null) as AuthUser | null;
           set({ user, loading: false });
-        } catch (e: any) {
+        } catch {
           set({ user: null, loading: false });
         }
       },
@@ -43,8 +43,8 @@ export const useAuth = create<AuthState>()(
             set({ error: 'Invalid credentials', loading: false });
             return false;
           }
-        } catch (e: any) {
-          set({ error: e?.response?.data?.message || 'Login failed', loading: false });
+        } catch (err: any) {
+          set({ error: err?.response?.data?.message || 'Login failed', loading: false });
           return false;
         }
       },

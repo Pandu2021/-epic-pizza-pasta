@@ -28,12 +28,11 @@ export default function Carousel({ slides, auto = true, intervalMs = 6000, class
 
   useEffect(() => {
     if (!auto || count <= 1) return;
-  if (timerRef.current) window.clearInterval(timerRef.current);
-  timerRef.current = window.setInterval(next, intervalMs);
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = window.setInterval(next, intervalMs);
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, intervalMs, count]);
 
   if (!count) return null;

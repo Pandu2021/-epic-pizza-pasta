@@ -8,16 +8,20 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  role         String   @default("customer")
-  name         String?
-  phone        String?
-  refreshTokenHash String? // stores hashed latest refresh token for rotation / revocation
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
+  id                     String   @id @default(uuid())
+  email                  String   @unique
+  passwordHash           String
+  role                   String   @default("customer")
+  name                   String?
+  phone                  String?
+  lineUserId             String?  @unique
+  refreshTokenHash       String? // stores hashed latest refresh token for rotation / revocation
+  emailVerifiedAt        DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  orders                 Order[]
+  passwordResetTokens    PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 model MenuItem {
@@ -97,4 +101,30 @@ model WebhookEvent {
   payload   Json
   signature String?
   createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

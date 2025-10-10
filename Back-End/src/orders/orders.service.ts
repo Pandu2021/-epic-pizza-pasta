@@ -21,6 +21,51 @@ export class OrdersService {
   ) {}
   // In-memory guard to avoid duplicate Google Sheets appends per order id (process lifetime)
   private appendedOrderIds = new Set<string>();
+
+  async ensurePhoneAccess(phone: string | undefined, user: { id: string; role?: string } | undefined) {
+    if (!user?.id) {
+      const err: any = new Error('Authentication required');
+      err.status = 401;
+      throw err;
+    }
+    if ((user.role || '').toLowerCase() === 'admin') return;
+    const targetRaw = (phone || '').trim();
+    if (!targetRaw) {
+      const err: any = new Error('Phone number required');
+      err.status = 400;
+      throw err;
+    }
+    const normalizedTarget = normalizeThaiPhone(targetRaw);
+    const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { phone: true } });
+    const userPhone = userRecord?.phone ? normalizeThaiPhone(userRecord.phone) : null;
+    if (userPhone && userPhone === normalizedTarget) return;
+    const err: any = new Error('Not permitted to view orders for this phone');
+    err.status = 403;
+    throw err;
+  }
+
+  async ensureUserOwnsOrderOrAdmin(orderId: string, user: { id: string; role?: string } | undefined) {
+    if (!user?.id) {
+      const err: any = new Error('Authentication required');
+      err.status = 401;
+      throw err;
+    }
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true, phone: true } });
+    if (!order) {
+      const err: any = new Error('Order not found');
+      err.status = 404;
+      throw err;
+    }
+    if ((user.role || '').toLowerCase() === 'admin') return order;
+    if (order.userId && order.userId === user.id) return order;
+    const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { phone: true } });
+    const userPhone = userRecord?.phone ? normalizeThaiPhone(userRecord.phone) : null;
+    const orderPhone = order.phone ? normalizeThaiPhone(order.phone) : null;
+    if (userPhone && orderPhone && userPhone === orderPhone) return order;
+    const err: any = new Error('Not permitted to access this order');
+    err.status = 403;
+    throw err;
+  }
   async listByPhone(phone: string) {
     const normalized = normalizeThaiPhone(phone);
     return prisma.order.findMany({ where: { phone: normalized }, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
@@ -42,7 +87,9 @@ export class OrdersService {
       deliveryType: dto.delivery?.type || 'delivery',
       providedDeliveryFee: dto.delivery?.fee,
     });
-  let { subtotal, deliveryFee, tax, discount, total, expectedReadyAt, expectedDeliveryAt } = pricing;
+  const { subtotal, deliveryFee, tax, discount, total } = pricing;
+  let expectedReadyAt = pricing.expectedReadyAt;
+  let expectedDeliveryAt = pricing.expectedDeliveryAt;
 
     // Simple non-transactional flow (safe for our simple create semantics)
     // Debug: log minimal shape
@@ -280,12 +327,6 @@ export class OrdersService {
           const html = `<p>Attached is the receipt for order <b>${created.id}</b>.</p>`;
           // Send to operational mailbox
           await sendEmail({ to: toFallback, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
-          // Attempt to read customer email from the order items inserted: fallback to querying the order
-          try {
-            const o = await prisma.order.findUnique({ where: { id: created.id }, select: { id: true } });
-            // If dto had an email, it's not stored in order schema; but caller may include email on customer - send if available via passed-in DTO
-            // NOTE: CreateOrderDto now accepts customer.email; we will try to read it from the initial DTO via closure - but DTO is out of scope here.
-          } catch {}
         } catch (e) {
           // log but don't fail order
           // eslint-disable-next-line no-console

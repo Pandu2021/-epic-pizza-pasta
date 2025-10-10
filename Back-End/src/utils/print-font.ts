@@ -16,7 +16,7 @@ export function resolvePrintFontPath(): string | undefined {
   ]
 
   const windowsFontsDir = process.platform === 'win32'
-    ? (process.env.WINDIR ? path.join(process.env.WINDIR, 'Fonts') : 'C\\\Windows\\Fonts')
+    ? (process.env.WINDIR ? path.join(process.env.WINDIR, 'Fonts') : 'C:\\Windows\\Fonts')
     : undefined
 
   if (windowsFontsDir && fs.existsSync(windowsFontsDir)) {

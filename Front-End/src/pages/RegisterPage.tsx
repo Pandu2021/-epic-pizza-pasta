@@ -19,13 +19,17 @@ export default function RegisterPage() {
     try {
       const payload = { email: email.trim().toLowerCase(), password, name };
       const { data } = await api.post('/auth/register', payload);
-      if (data?.id) {
-        // auto-login after register
-        try { await api.post('/auth/login', { email: payload.email, password }); } catch {}
-        navigate('/profile', { replace: true });
-      } else {
-        setError(t('register.error_failed'));
+      if (data?.ok) {
+        navigate('/verify-email/check', {
+          replace: true,
+          state: {
+            email: payload.email,
+            verification: data?.verification ?? null,
+          },
+        });
+        return;
       }
+      setError(t('register.error_failed'));
     } catch (e: any) {
       const msg = e?.response?.status === 409
         ? t('register.error_email_in_use')

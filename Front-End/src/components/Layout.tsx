@@ -47,7 +47,6 @@ export default function Layout({ children }: Props) {
       }
     }, 250);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [term, isMenuList, isMenuDetail]);
   return (
     <div className="min-h-screen flex flex-col">

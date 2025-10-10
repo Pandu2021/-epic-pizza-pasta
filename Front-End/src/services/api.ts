@@ -79,5 +79,8 @@ export const endpoints = {
   omiseCharge: (body: { orderId: string; amount: number; token: string; description?: string }) => api.post('/payments/omise/charge', body),
   me: () => api.get('/auth/me'),
   login: (body: { email: string; password: string }) => api.post('/auth/login', body),
-  logout: () => api.post('/auth/logout')
+  logout: () => api.post('/auth/logout'),
+  forgotPassword: (body: { email: string; channel?: 'email' | 'whatsapp' | 'line' }) => api.post('/auth/forgot-password', body),
+  resetPassword: (body: { token: string; password: string }) => api.post('/auth/reset-password', body),
+  contact: (body: { name?: string; email?: string; message: string }) => api.post('/contact', body),
 };

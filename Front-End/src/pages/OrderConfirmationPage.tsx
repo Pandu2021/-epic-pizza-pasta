@@ -48,7 +48,7 @@ export default function OrderConfirmationPage() {
       // Fallback: try to pick active order from my orders
       try {
         const { data: list } = await endpoints.myOrders();
-        const arr = Array.isArray(list) ? list : [];
+         const arr = Array.isArray(list) ? list : [];
         const active = [...arr]
           .filter((o: any) => !['delivered','cancelled'].includes(String(o.status || '').toLowerCase()))
           .sort((a: any,b: any) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
@@ -76,7 +76,7 @@ export default function OrderConfirmationPage() {
           setDelivered(res.data?.status === 'delivered');
           setCancelled(res.data?.status === 'cancelled');
         }
-      } catch (e: any) {
+      } catch {
         if (!ignore) setError('Failed to load order');
       } finally { if (!ignore) setLoading(false); }
       // fetch initial eta (best-effort)
@@ -102,10 +102,27 @@ export default function OrderConfirmationPage() {
             }
           } catch {}
         };
-        es.onerror = () => { try { es.close(); } catch {}; };
+        es.onerror = () => {
+          try {
+            es.close();
+          } catch {
+            // ignore close errors
+          }
+        };
       } catch {}
     })();
-    return () => { ignore = true; if (esRef.current) { try { esRef.current.close(); } catch {} } if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current); if (progressTimerRef.current) window.clearInterval(progressTimerRef.current); };
+    return () => {
+      ignore = true;
+      if (esRef.current) {
+        try {
+          esRef.current.close();
+        } catch {
+          // ignore close errors
+        }
+      }
+      if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current);
+      if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
+    };
   }, [resolvedOrderId]);
 
   // Progress animation loop
@@ -122,7 +139,9 @@ export default function OrderConfirmationPage() {
     };
     update();
     progressTimerRef.current = window.setInterval(update, 5000);
-    return () => { if (progressTimerRef.current) window.clearInterval(progressTimerRef.current); };
+    return () => {
+      if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
+    };
   }, [order, eta?.expectedDeliveryAt, cancelled, delivered]);
 
   const [actionLoading, setActionLoading] = useState<'confirm' | 'cancel' | null>(null);

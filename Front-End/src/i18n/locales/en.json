@@ -76,7 +76,10 @@
     "name": "Name",
     "phone": "Phone",
     "placeholder_name": "Your name",
-    "placeholder_phone": "08xxxxxxxx",
+  "placeholder_phone": "+66 95xxxxxxx",
+  "email": "Email",
+  "line_user_id": "LINE ID",
+  "placeholder_line_user_id": "Your LINE ID (optional)",
     "saving": "Saving…",
     "save": "Save",
     "cancel": "Cancel",
@@ -191,5 +194,16 @@
     "error_email_in_use": "Email already in use",
     "have_account": "Already have an account?",
     "login": "Login"
+  },
+  "verify_email_check": {
+    "almost_there": "You're almost there!",
+    "subtitle_with_email": "We just sent a verification link to {{email}}. Please confirm your email to activate your account.",
+    "subtitle_generic": "We just sent a verification link to your email. Please confirm it to activate your account.",
+    "email_not_sent": "We couldn't confirm that the email was queued automatically. If it doesn't arrive in a few minutes, please contact us.",
+    "expires_hint": "The link expires around {{datetime}}.",
+    "spam_hint": "Check your spam or promotions folder and search for \"Epic Pizza & Pasta\" if you don't see it.",
+    "resend_hint": "Need another email? Sign in later and choose \"Resend verification\" from your profile.",
+    "cta_login": "Back to login",
+    "cta_home": "Return to home"
   }
 }

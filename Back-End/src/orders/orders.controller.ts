@@ -1,14 +1,14 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post, Query, UseGuards, Req, Patch, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post, Query, UseGuards, Req, Patch, Res, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { OrdersEvents } from './orders.events';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Request } from 'express';
-import { auth } from '../auth/auth.service';
 import fs from 'node:fs'
-import path from 'node:path'
 import { sendEmail } from '../utils/email'
+import { buildApiUrl } from '../utils/env'
+import { Roles, RolesGuard } from '../common/guards/roles.guard';
 
 @Controller('api/orders')
 export class OrdersController {
@@ -17,9 +17,13 @@ export class OrdersController {
     console.log('[orders.controller] constructed; orders injected =', !!this.orders);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  async list(@Query('phone') phone?: string) {
-    if (!phone) return { error: 'phone query is required to list orders' };
+  async list(@Query('phone') phone: string | undefined, @Req() req: Request) {
+    if (!phone) {
+      throw new BadRequestException('phone query is required to list orders');
+    }
+    await this.orders.ensurePhoneAccess(phone, (req as any).user);
     return this.orders.listByPhone(phone);
   }
 
@@ -28,13 +32,16 @@ export class OrdersController {
   async create(@Body() dto: CreateOrderDto, @Req() req: Request) {
     console.log('[orders.controller] create (auth required) called; user =', (req as any).user?.id);
     try {
-      const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
-      const order = await this.orders.create(dto, userId);
+    const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
+    const order = await this.orders.create(dto, userId);
+    const orderId = order?.id;
+    const receiptUrl = orderId ? buildApiUrl(`/orders/${orderId}/receipt.pdf`) : undefined;
       // If customer provided an email in the order DTO, enqueue sending receipt PDF to them.
       try {
         const custEmail = (dto as any)?.customer?.email as string | undefined;
-        const orderIdForEmail = order?.id
+        const orderIdForEmail = order?.id;
         if (custEmail && orderIdForEmail) {
+          const receiptPdfUrl = buildApiUrl(`/orders/${orderIdForEmail}/receipt.pdf`);
           // Fire-and-forget: generate PDF and email to customer (best-effort)
           (async () => {
             try {
@@ -42,7 +49,7 @@ export class OrdersController {
               const ts = order?.createdAt ? new Date(order.createdAt as any).toISOString().slice(0,19).replace(/[:T]/g,'-') : 'receipt';
               const filename = `receipt-${String(orderIdForEmail).slice(0,8)}-${ts}.pdf`;
               const subject = `Pesanan Anda diterima - ${orderIdForEmail}`;
-              const html = `<p>Terima kasih! Terlampir adalah bukti pesanan Anda (Order <b>${orderIdForEmail}</b>).</p>`;
+              const html = `<p>Terima kasih! Terlampir adalah bukti pesanan Anda (Order <b>${orderIdForEmail}</b>).</p><p>Anda juga dapat mengunduhnya di sini: <a href="${receiptPdfUrl}">${receiptPdfUrl}</a></p>`;
               await sendEmail({ to: custEmail, subject, html, attachments: [{ filename, path: filePath, contentType: 'application/pdf' }] });
             } catch (e) {
               // eslint-disable-next-line no-console
@@ -54,7 +61,7 @@ export class OrdersController {
         // swallow errors
       }
       return {
-        orderId: order?.id,
+        orderId,
         status: order?.status,
         amountTotal: order?.total,
         tax: order?.tax,
@@ -63,6 +70,7 @@ export class OrdersController {
         discount: order?.discount,
         expectedReadyAt: (order as any)?.expectedReadyAt,
         expectedDeliveryAt: (order as any)?.expectedDeliveryAt,
+        receiptUrl,
         payment: order?.payment && {
           type: order.payment.method,
           qrPayload: order.payment.promptpayQR,
@@ -102,23 +110,31 @@ export class OrdersController {
     return this.orders.listForUser(u.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  get(@Param('id') id: string) {
+  async get(@Param('id') id: string, @Req() req: Request) {
+    await this.orders.ensureUserOwnsOrderOrAdmin(id, (req as any).user);
     return this.orders.get(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
-  cancel(@Param('id') id: string) {
+  async cancel(@Param('id') id: string, @Req() req: Request) {
+    await this.orders.ensureUserOwnsOrderOrAdmin(id, (req as any).user);
     return this.orders.cancel(id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':id/confirm-delivered')
   confirmDelivered(@Param('id') id: string) {
     return this.orders.confirmDelivered(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id/eta')
-  eta(@Param('id') id: string) {
+  async eta(@Param('id') id: string, @Req() req: Request) {
+    await this.orders.ensureUserOwnsOrderOrAdmin(id, (req as any).user);
     return this.orders.eta(id);
   }
 
@@ -177,11 +193,15 @@ export class OrdersController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id/stream')
-  stream(@Param('id') id: string, @Res() res: Response) {
+  async stream(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+    await this.orders.ensureUserOwnsOrderOrAdmin(id, (req as any).user);
     this.events.subscribe(id, res);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() body: { status: string; driverName?: string }) {
     return this.orders.updateStatus(id, body.status, body.driverName);

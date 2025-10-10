@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ProductCard from '../components/ProductCard';
-import { useNavigate } from 'react-router-dom';
 import CategoryChips from '../components/CategoryChips';
 import { useCart } from '../store/cartStore';
 import { api } from '../services/api';
@@ -12,7 +11,6 @@ export default function MenuPage() {
   const { i18n } = useTranslation();
   const t = (s: { en: string; th: string }) => (i18n.language === 'th' ? s.th : s.en);
   const { addItem } = useCart();
-  const navigate = useNavigate();
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,7 +179,7 @@ export default function MenuPage() {
           <h3 className="text-lg md:text-xl font-semibold">Search results for “{query}”</h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((it) => {
-              const requiresOptions = !!(it.priceL || it.priceXL); // pizzas with size
+              const requiresOptions = !!(it.priceL || it.priceXL) || it.category === 'pasta';
               return (
                 <ProductCard
                   key={it.id}
@@ -211,7 +209,7 @@ export default function MenuPage() {
             <h3 className="text-lg md:text-xl font-semibold">{i18n.t(g.title)}</h3>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {items.map((it) => {
-                const requiresOptions = !!(it.priceL || it.priceXL);
+                const requiresOptions = !!(it.priceL || it.priceXL) || it.category === 'pasta';
                 return (
                   <ProductCard
                     key={it.id}

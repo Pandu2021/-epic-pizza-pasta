@@ -37,8 +37,8 @@ export async function listWindowsPrinters(): Promise<Array<{ Name: string }>> {
 
 export async function printPdfViaShell(printerName: string | undefined, filePath: string): Promise<void> {
   const abs = path.resolve(filePath)
-  const printerArg = printerName ? `\"${printerName}\"` : ''
+  const printerArg = printerName ? `"${printerName}"` : ''
   // Use default associated PDF viewer to print silently (may show UI depending on viewer)
-  const cmd = `Start-Process -FilePath \"${abs}\" -Verb Print${printerName ? 'To' : ''} ${printerArg}`
+  const cmd = `Start-Process -FilePath "${abs}" -Verb Print${printerName ? 'To' : ''} ${printerArg}`
   await runPwsh(['-Command', cmd])
 }

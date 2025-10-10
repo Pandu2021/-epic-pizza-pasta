@@ -19,6 +19,6 @@
     "./node_modules/@types"
   ]
   },
-  "include": ["src/**/*.ts", "prisma/seed/**/*.ts", "scripts/**/*.ts"],
+  "include": ["src/**/*.ts", "prisma/seed/**/*.ts", "scripts/**/*.ts", "types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

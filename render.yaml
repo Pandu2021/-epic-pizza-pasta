@@ -31,7 +31,99 @@ services:
       - key: JWT_PUBLIC_KEY
         sync: false
       - key: CORS_ORIGINS
-        value: https://epic-pizza-frontend.onrender.com
+        value: "https://epicfoodorders.com,https://www.epicfoodorders.com,https://epic-pizza-frontend.onrender.com"
+      - key: API_BASE_URL
+        value: https://api.epicfoodorders.com/api
+      - key: WEB_APP_BASE_URL
+        value: https://epicfoodorders.com
+      - key: APP_BASE_URL
+        value: https://epicfoodorders.com
+      - key: PUBLIC_WEB_URL
+        value: https://epicfoodorders.com
+      - key: BACKEND_PUBLIC_URL
+        value: https://api.epicfoodorders.com
+      - key: JWT_ACCESS_TTL
+        value: 900s
+      - key: JWT_REFRESH_TTL
+        value: 7d
+      - key: CSRF_SECRET
+        sync: false
+      - key: MENU_CACHE_TTL_MS
+        value: "60000"
+      - key: PREWARM_MENU
+        value: "true"
+      - key: HTTP_LOG
+        value: "true"
+      - key: HELMET_CSP
+        value: "false"
+      - key: BODY_LIMIT
+        value: 200kb
+      - key: PGCLIENTENCODING
+        value: UTF8
+      - key: PRINTER_HOST
+        sync: false
+      - key: PRINTER_PORT
+        sync: false
+      - key: PRINTER_TEST_MESSAGE
+        sync: false
+      - key: PRINTER_PROTOCOL
+        sync: false
+      - key: PRINTER_IPP_PORT
+        sync: false
+      - key: PRINTER_IPP_PATH
+        sync: false
+      - key: WINDOWS_PRINTER_NAME
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PROMPTPAY_MERCHANT_ID
+        sync: false
+      - key: PROMPTPAY_ACCOUNT_TYPE
+        value: STATIC
+      - key: PROMPTPAY_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: PASSWORD_RESET_TOKEN_TTL_MS
+        value: "1800000"
+      - key: RESTAURANT_LAT
+        value: "13.7563"
+      - key: RESTAURANT_LNG
+        value: "100.5018"
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEET_SERVICE_EMAIL
+        sync: false
+      - key: GOOGLE_SHEETS_PRIVATE_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: OMISE_PUBLIC_KEY
+        sync: false
+      - key: OMISE_SECRET_KEY
+        sync: false
+      - key: OMISE_WEBHOOK_ENDPOINT
+        value: https://epicfoodorders.com/webhook/omise
   
   - type: web
     name: epic-pizza-frontend
@@ -42,9 +134,21 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
-        sync: false
+        value: https://api.epicfoodorders.com/api
       - key: VITE_APP_NAME
         value: Epic Pizza & Pasta
+      - key: VITE_RESTAURANT_LAT
+        value: "13.862800"
+      - key: VITE_RESTAURANT_LNG
+        value: "100.514900"
+      - key: VITE_MAP_LAT
+        value: "13.8732674"
+      - key: VITE_MAP_LNG
+        value: "100.4807412"
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: VITE_OMISE_PUBLIC_KEY
+        sync: false
     routes:
       - type: rewrite
         source: /*

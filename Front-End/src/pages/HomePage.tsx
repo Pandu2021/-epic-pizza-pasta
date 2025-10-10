@@ -70,7 +70,6 @@ export default function HomePage() {
       }
     })();
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Local hero image from assets for consistent display; fallback to margherita
@@ -147,51 +146,53 @@ export default function HomePage() {
           {error && (
             <div className="col-span-full text-sm text-rose-600" role="alert">{error}</div>
           )}
-          {!loading && featured.map((it) => (
-            <div
-              key={it.id}
-              className="card overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-xl cursor-pointer"
-              onClick={() => navigate(`/menu/${it.id}`)}
-              aria-label={typeof it.name === 'object' ? tt(it.name) : (it.name || '')}
-            >
-              <img src={menuImg((it.images && it.images[0]) || it.image)} alt={typeof it.name === 'object' ? tt(it.name) : (it.name || '')} className="aspect-video w-full object-cover" />
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="text-sm uppercase tracking-wide text-slate-500">{it.category}</div>
-                <h3 className="mt-1 font-semibold text-lg">{typeof it.name === 'object' ? tt(it.name) : (it.name || '')}</h3>
-                <p className="mt-2 text-sm text-slate-600 line-clamp-4">
-                  {it.description
-                    ? (typeof it.description === 'object' ? tt(it.description as { en: string; th: string }) : (it.description || ''))
-                    : ''}
-                </p>
-                <div className="mt-3 font-semibold">฿ {priceOf(it).toFixed(0)}</div>
-                <button
-                  className={`btn w-full mt-4 transition-colors duration-300 ${added[String(it.id)] ? 'bg-emerald-500 hover:bg-emerald-600' : 'btn-primary'}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const requiresOptions = !!(it.priceL || it.priceXL);
-                    if (requiresOptions) {
-                      navigate(`/menu/${it.id}`);
-                      return;
-                    }
-                    addItem({ id: it.id, name: typeof it.name === 'object' ? tt(it.name) : (it.name || ''), price: priceOf(it), image: menuImg((it.images && it.images[0]) || it.image) });
-                    const key = String(it.id);
-                    setAdded((prev) => ({ ...prev, [key]: true }));
-                    setTimeout(() => setAdded((prev) => ({ ...prev, [key]: false })), 2000);
-                  }}
-                  disabled={!!added[String(it.id)] && !((it.priceL || it.priceXL))}
-                  aria-live="polite"
-                >
-                  { (it.priceL || it.priceXL) ? (
-                    <span>{t('choose_options', 'Choose Options')}</span>
-                  ) : added[String(it.id)] ? (
-                    <span className="inline-flex items-center"><CheckIcon className="size-5 mr-2" /> {t('added_to_cart', 'Added!')}</span>
-                  ) : (
-                    <span className="inline-flex items-center"><ShoppingCartIcon className="size-5 mr-2" /> {t('add_to_cart')}</span>
-                  )}
-                </button>
+          {!loading && featured.map((it) => {
+            const requiresOptions = !!(it.priceL || it.priceXL) || it.category === 'pasta';
+            return (
+              <div
+                key={it.id}
+                className="card overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-xl cursor-pointer"
+                onClick={() => navigate(`/menu/${it.id}`)}
+                aria-label={typeof it.name === 'object' ? tt(it.name) : (it.name || '')}
+              >
+                <img src={menuImg((it.images && it.images[0]) || it.image)} alt={typeof it.name === 'object' ? tt(it.name) : (it.name || '')} className="aspect-video w-full object-cover" />
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="text-sm uppercase tracking-wide text-slate-500">{it.category}</div>
+                  <h3 className="mt-1 font-semibold text-lg">{typeof it.name === 'object' ? tt(it.name) : (it.name || '')}</h3>
+                  <p className="mt-2 text-sm text-slate-600 line-clamp-4">
+                    {it.description
+                      ? (typeof it.description === 'object' ? tt(it.description as { en: string; th: string }) : (it.description || ''))
+                      : ''}
+                  </p>
+                  <div className="mt-3 font-semibold">฿ {priceOf(it).toFixed(0)}</div>
+                  <button
+                    className={`btn w-full mt-4 transition-colors duration-300 ${added[String(it.id)] ? 'bg-emerald-500 hover:bg-emerald-600' : 'btn-primary'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (requiresOptions) {
+                        navigate(`/menu/${it.id}`);
+                        return;
+                      }
+                      addItem({ id: it.id, name: typeof it.name === 'object' ? tt(it.name) : (it.name || ''), price: priceOf(it), image: menuImg((it.images && it.images[0]) || it.image) });
+                      const key = String(it.id);
+                      setAdded((prev) => ({ ...prev, [key]: true }));
+                      setTimeout(() => setAdded((prev) => ({ ...prev, [key]: false })), 2000);
+                    }}
+                    disabled={!!added[String(it.id)] && !requiresOptions}
+                    aria-live="polite"
+                  >
+                    { requiresOptions ? (
+                      <span>{t('choose_options', 'Choose Options')}</span>
+                    ) : added[String(it.id)] ? (
+                      <span className="inline-flex items-center"><CheckIcon className="size-5 mr-2" /> {t('added_to_cart', 'Added!')}</span>
+                    ) : (
+                      <span className="inline-flex items-center"><ShoppingCartIcon className="size-5 mr-2" /> {t('add_to_cart')}</span>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

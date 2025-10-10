@@ -78,6 +78,7 @@ npm run print:pdf -- --printer "HP301B84E019D9"
 - HSTS auto-enabled in production; CSP toggle via env (`HELMET_CSP`)
 - Strong DTO validation on admin controllers (users/menu/orders)
 - Auth endpoints have tighter rate limits; body size limit is configurable (`BODY_LIMIT`)
+- Orders endpoints now enforce authenticated access (owner or admin) and restrict status changes to admin role
 - Trust proxy enabled for correct HTTPS/IP when behind reverse proxies
 - Hardened .gitignore and added complete documentation files
 

@@ -9,13 +9,13 @@ import { motion } from 'framer-motion';
 import PizzaCarProgress from '../components/PizzaCarProgress';
 import { computeProgress, shouldAutoConfirm } from '../utils/tracking';
 
-type MeResponse = { user?: { id: string; email: string; name?: string; role: string; phone?: string } };
+type MeResponse = { user?: { id: string; email: string; name?: string; role: string; phone?: string; lineUserId?: string } };
 
 const ProfilePage = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { count, total } = useCart();
-  const { user, loading: authLoading, fetchMe, logout: authLogout } = useAuth();
+  const { user, fetchMe, logout: authLogout } = useAuth();
   const cartCount = count();
   const cartTotal = total();
   // Simple state to trigger pulse animation on change
@@ -30,10 +30,9 @@ const ProfilePage = () => {
   // Local wrapper states (legacy compatibility) now driven by auth store
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [loading, setLoading] = useState(true); // page-level loading while fetching me & orders
-  const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ name: string; phone: string }>({ name: '', phone: '' });
+  const [form, setForm] = useState<{ name: string; phone: string; lineUserId: string }>({ name: '', phone: '', lineUserId: '' });
   const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; total: number; status: string; deliveryType?: string; payment?: { status: string; method: string } }>>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   // Active delivery tracking
@@ -61,7 +60,7 @@ const ProfilePage = () => {
     const normalized = user ? { ...user, role: user.role || 'customer' } as MeResponse['user'] : null;
     setMe(normalized);
     if (user) {
-      setForm({ name: user.name ?? '', phone: user.phone ?? '' });
+  setForm({ name: user.name ?? '', phone: user.phone ?? '', lineUserId: user.lineUserId ?? '' });
       // fetch orders only when user present
       (async () => {
         setOrdersLoading(true);
@@ -88,11 +87,16 @@ const ProfilePage = () => {
     if (!me) return;
     setSaving(true);
     try {
-      const { data } = await api.post('/auth/update-profile', { name: form.name.trim() || null, phone: form.phone.trim() || null });
+      const payload = {
+        name: form.name.trim() || null,
+        phone: form.phone.trim() || null,
+        lineUserId: form.lineUserId.trim() || null,
+      };
+      const { data } = await api.post('/auth/update-profile', payload);
       const updated = (data?.user ?? null) as MeResponse['user'] | null;
       if (updated) setMe(updated);
       setShowSettings(false);
-    } catch (e) {
+    } catch {
       // noop minimal error handling, could add toast
     } finally {
       setSaving(false);
@@ -174,10 +178,25 @@ const ProfilePage = () => {
             }
           } catch {}
         };
-        es.onerror = () => { try { es.close(); } catch {}; };
+        es.onerror = () => {
+          try {
+            es.close();
+          } catch {
+            // ignore close errors
+          }
+        };
       } catch {}
     })();
-    return () => { ignore = true; if (esRef.current) { try { esRef.current.close(); } catch {} } };
+    return () => {
+      ignore = true;
+      if (esRef.current) {
+        try {
+          esRef.current.close();
+        } catch {
+          // ignore close errors
+        }
+      }
+    };
   }, [activeOrder]);
 
   // Progress loop
@@ -267,36 +286,66 @@ const ProfilePage = () => {
                 {showSettings && (
                   <div className="mt-6 border-t border-slate-200 pt-6">
                     <h3 className="font-semibold mb-3">{t('profile.edit_profile')}</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       <div>
-                        <label className="block text-sm text-slate-600 mb-1">{t('profile.name')}</label>
+                        <label htmlFor="profile-email" className="block text-sm text-slate-600 mb-1">{t('profile.email', 'Email')}</label>
+                        <input
+                          className="input bg-slate-100 text-slate-500 cursor-not-allowed"
+                          value={me?.email || ''}
+                          readOnly
+                          id="profile-email"
+                          aria-readonly="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="profile-name" className="block text-sm text-slate-600 mb-1">{t('profile.name')}</label>
                         <input
                           className="input"
                           value={form.name}
+                          id="profile-name"
                           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                           placeholder={t('profile.placeholder_name')}
                         />
                       </div>
                       <div>
-                        <label className="block text-sm text-slate-600 mb-1">{t('profile.phone')}</label>
+                        <label htmlFor="profile-phone" className="block text-sm text-slate-600 mb-1">{t('profile.phone')}</label>
                         <input
                           className="input"
                           value={form.phone}
+                          id="profile-phone"
                           onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                           placeholder={t('profile.placeholder_phone')}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="profile-line-user" className="block text-sm text-slate-600 mb-1">{t('profile.line_user_id', 'LINE ID')}</label>
+                        <input
+                          className="input"
+                          value={form.lineUserId}
+                          id="profile-line-user"
+                          onChange={e => setForm(f => ({ ...f, lineUserId: e.target.value }))}
+                          placeholder={t('profile.placeholder_line_user_id', 'Your LINE ID (optional)')}
                         />
                       </div>
                     </div>
                     <div className="mt-4 flex gap-3">
                       <button className="btn-primary" onClick={saveSettings} disabled={saving}>{saving ? t('profile.saving') : t('profile.save')}</button>
-                      <button className="btn-outline" onClick={() => { setShowSettings(false); setForm({ name: me?.name ?? '', phone: me?.phone ?? '' }); }}>{t('profile.cancel')}</button>
+                      <button
+                        className="btn-outline"
+                        onClick={() => {
+                          setShowSettings(false);
+                          setForm({ name: me?.name ?? '', phone: me?.phone ?? '', lineUserId: me?.lineUserId ?? '' });
+                        }}
+                      >
+                        {t('profile.cancel')}
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
               <div>
-                <div className="mt-2 text-slate-600">{error || t('profile.not_signed_in')}</div>
+                <div className="mt-2 text-slate-600">{t('profile.not_signed_in')}</div>
                 <div className="mt-4 flex gap-3">
                   <Link to="/login" className="btn-primary">{t('profile.login')}</Link>
                   <Link to="/register" className="btn-outline">{t('profile.register')}</Link>

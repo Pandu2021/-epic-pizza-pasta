@@ -14,9 +14,11 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const OrderHistoryPage = lazy(() => import('./pages/OrderHistoryPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
 const PaymentFailedPage = lazy(() => import('./pages/PaymentFailedPage'));
+const VerifyEmailCheckPage = lazy(() => import('./pages/VerifyEmailCheckPage'));
 
 export default function App() {
   const location = useLocation();
@@ -45,7 +47,9 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email/check" element={<VerifyEmailCheckPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/orders" element={<OrderHistoryPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
             <Route path="/payment-failed" element={<PaymentFailedPage />} />

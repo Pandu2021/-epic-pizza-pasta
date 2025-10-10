@@ -43,7 +43,6 @@ export async function generateA6ReceiptPdf(order: OrderReceipt): Promise<string>
   const filePath = path.join(dir, `receipt-${order.id}.pdf`)
 
   const margin = mm(6)
-  const lineGap = 2
   const doc = new PDFDocument({ size: [A6[0], A6[1]], margin })
   const stream = fs.createWriteStream(filePath)
   doc.pipe(stream)

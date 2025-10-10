@@ -30,7 +30,7 @@ import { AuthController } from './auth/auth.controller';
           JWT_REFRESH_TTL: z.string().optional(),
           CORS_ORIGINS: z.string().optional(),
           COOKIE_SECRET: z.string().min(10),
-        });
+        }).passthrough();
         const parsed = schema.safeParse(config);
         if (!parsed.success) {
           // eslint-disable-next-line no-console
