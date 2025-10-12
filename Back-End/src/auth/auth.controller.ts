@@ -11,6 +11,23 @@ import { google } from 'googleapis';
 
 const CSRF_COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
+function resolveCookieDomain(req: Request): string | undefined {
+  if (CSRF_COOKIE_DOMAIN) {
+    return CSRF_COOKIE_DOMAIN;
+  }
+  const forwardedHost = (req.headers['x-forwarded-host'] as string | undefined)?.split(',')[0]?.trim();
+  const host = forwardedHost || req.hostname;
+  if (!host) return undefined;
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host)) {
+    return undefined;
+  }
+  const lowerHost = host.toLowerCase();
+  if (lowerHost.startsWith('api.')) {
+    return `.${host.substring(4)}`;
+  }
+  return undefined;
+}
+
 function maskEmail(email: string) {
   const [user, domain] = email.split('@');
   if (!domain) return email;
@@ -641,8 +658,9 @@ export class AuthController {
         secure: process.env.NODE_ENV === 'production',
         path: '/',
       };
-      if (CSRF_COOKIE_DOMAIN) {
-        options.domain = CSRF_COOKIE_DOMAIN;
+      const cookieDomain = resolveCookieDomain(req);
+      if (cookieDomain) {
+        options.domain = cookieDomain;
       }
       res.cookie('XSRF-TOKEN', token, options);
     }
