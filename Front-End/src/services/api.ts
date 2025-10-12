@@ -77,6 +77,7 @@ export const endpoints = {
   createPromptPay: (body: { orderId: string; amount: number }) => api.post('/payments/promptpay/create', body),
   createOmisePromptPay: (body: { orderId: string; amount: number; description?: string }) => api.post('/payments/omise/promptpay', body),
   omiseCharge: (body: { orderId: string; amount: number; token: string; description?: string }) => api.post('/payments/omise/charge', body),
+  paymentConfig: () => api.get('/payments/config'),
   me: () => api.get('/auth/me'),
   login: (body: { email: string; password: string }) => api.post('/auth/login', body),
   logout: () => api.post('/auth/logout'),

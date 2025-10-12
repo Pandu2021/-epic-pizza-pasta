@@ -52,6 +52,10 @@ export default function CheckoutPage() {
   const [breakdown, setBreakdown] = useState<{ subtotal: number; deliveryFee: number; tax: number; discount: number; total: number; expectedReadyAt?: string; expectedDeliveryAt?: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [omisePublicKey, setOmisePublicKey] = useState<string | null>(() => {
+    const pk = import.meta.env.VITE_OMISE_PUBLIC_KEY as string | undefined;
+    return pk || null;
+  });
   const pollRef = useRef<number | null>(null);
 
   const {
@@ -86,6 +90,19 @@ export default function CheckoutPage() {
   const isCartEmpty = items.length === 0;
 
   const MIN_ORDER = 99;
+  useEffect(() => {
+    if (omisePublicKey) return;
+    (async () => {
+      try {
+        const cfg = await endpoints.paymentConfig();
+        const pk = cfg.data?.omisePublicKey as string | undefined;
+        if (pk) setOmisePublicKey(pk);
+      } catch {
+        // ignore and fallback to runtime fetch during card submission
+      }
+    })();
+  }, [omisePublicKey]);
+
   const onSubmit = async (data: FormValues) => {
     setError(null);
     if (items.length === 0) {
@@ -138,7 +155,16 @@ export default function CheckoutPage() {
         setQrImageUrl(qrImg);
       } else if (data.paymentMethod === 'card') {
         // Tokenize with OmiseJS (test mode). Expect window.Omise defined after script load.
-        const pk = import.meta.env.VITE_OMISE_PUBLIC_KEY as string | undefined;
+        let pk = omisePublicKey;
+        if (!pk) {
+          try {
+            const cfg = await endpoints.paymentConfig();
+            pk = (cfg.data?.omisePublicKey as string | undefined) || null;
+            if (pk) setOmisePublicKey(pk);
+          } catch {
+            // ignore, error handled below when pk still missing
+          }
+        }
         if (!pk) throw new Error('Omise public key not configured');
 
         // Lazy-load Omise script if not present

@@ -11,6 +11,22 @@ import { enqueue } from '../utils/job-queue';
 @Controller('api')
 export class PaymentsController {
   constructor(private readonly printer: OrdersPrintService) {}
+
+  @Get('payments/config')
+  getConfig() {
+    const publicKey =
+      process.env.OMISE_PUBLIC_KEY ||
+      process.env.OMISE_PUBLIC_KEY_TEST ||
+      process.env.VITE_OMISE_PUBLIC_KEY ||
+      process.env.NEXT_PUBLIC_OMISE_PUBLIC_KEY ||
+      process.env.PUBLIC_OMISE_PUBLIC_KEY ||
+      null;
+
+    return {
+      omisePublicKey: publicKey,
+      omiseEnabled: Boolean(publicKey && process.env.OMISE_SECRET_KEY),
+    };
+  }
   // Generate PromptPay QR via local EMVCo builder (legacy)
   @Post('payments/promptpay/create')
   async createPromptPay(@Body() body: { orderId: string; amount: number }) {
