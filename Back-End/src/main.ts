@@ -20,6 +20,7 @@ function cryptoRandomId() {
 }
 
 async function bootstrap() {
+  const cookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   // When running behind cPanel/Apache (Passenger) or any reverse proxy
@@ -125,6 +126,7 @@ async function bootstrap() {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
+      domain: cookieDomain,
     },
     // Client sends the token via header, generated from secret; FE reads token from XSRF-TOKEN cookie set by /api/auth/csrf
     value: (req: any) => (req.headers['x-csrf-token'] as string) || req.body?.csrfToken,

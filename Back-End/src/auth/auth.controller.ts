@@ -1,13 +1,15 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UseGuards, ConflictException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { prisma } from '../prisma';
 import * as argon2 from 'argon2';
-import { Response, Request } from 'express';
+import { Response, Request, CookieOptions } from 'express';
 import { auth } from './auth.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { sendEmail } from '../utils/email';
 import { sendWhatsAppMessage, sendLineMessage, maskPhone, maskLineId } from '../utils/messaging';
 import { createOAuthState, consumeOAuthState } from './oauth.state';
 import { google } from 'googleapis';
+
+const CSRF_COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
 function maskEmail(email: string) {
   const [user, domain] = email.split('@');
@@ -633,12 +635,16 @@ export class AuthController {
   csrf(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req as any).csrfToken?.() as string | undefined;
     if (token) {
-  res.cookie('XSRF-TOKEN', token, {
+      const options: CookieOptions = {
         httpOnly: false,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-      });
+      };
+      if (CSRF_COOKIE_DOMAIN) {
+        options.domain = CSRF_COOKIE_DOMAIN;
+      }
+      res.cookie('XSRF-TOKEN', token, options);
     }
     return { csrfToken: token };
   }

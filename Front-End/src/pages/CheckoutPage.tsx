@@ -317,7 +317,7 @@ export default function CheckoutPage() {
               <input className="border rounded p-2 w-full" placeholder="YYYY" {...register('cardExpYear')} />
               <input className="border rounded p-2 w-full" placeholder="CVC" {...register('cardCvc')} />
             </div>
-            <p className="text-xs text-gray-500">Use Omise test card: 4242 4242 4242 4242, any future date, any CVC</p>
+            {/* Test card hint removed for production */}
           </div>
         )}
         <div className="space-y-2" aria-live="polite">
