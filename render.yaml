@@ -1,6 +1,6 @@
 databases:
   - name: epic-pizza-db
-    plan: free
+    plan: Basic-1gb
     databaseName: epic_pizza
     user: pizza
     region: oregon
@@ -30,18 +30,40 @@ services:
         sync: false
       - key: JWT_PUBLIC_KEY
         sync: false
+      - key: EMAIL_VERIFICATION_TOKEN_TTL_MS
+        value: "86400000"
+      - key: OAUTH_STATE_TTL_MS
+        value: "600000"
       - key: CORS_ORIGINS
-        value: "https://epicfoodorders.com,https://www.epicfoodorders.com,https://epic-pizza-frontend.onrender.com"
+        value: "https://epicfoodorders.com,https://www.epicfoodorders.com,https://admin.epicfoodorders.com,https://epic-pizza-frontend.onrender.com,https://epic-pizza-admin.onrender.com"
       - key: API_BASE_URL
+        value: https://api.epicfoodorders.com/api
+      - key: PUBLIC_API_URL
         value: https://api.epicfoodorders.com/api
       - key: WEB_APP_BASE_URL
         value: https://epicfoodorders.com
       - key: APP_BASE_URL
         value: https://epicfoodorders.com
+      - key: APP_ORIGIN
+        value: https://epicfoodorders.com
+      - key: DOMAIN
+        value: epicfoodorders.com
       - key: PUBLIC_WEB_URL
         value: https://epicfoodorders.com
       - key: BACKEND_PUBLIC_URL
         value: https://api.epicfoodorders.com
+      - key: THAI_VAT_RATE
+        value: "0.07"
+      - key: ORDER_COOK_MINUTES
+        value: "15"
+      - key: ORDER_COOK_PER_ITEM_MIN
+        value: "2"
+      - key: DELIVERY_SPEED_KMPH
+        value: "30"
+      - key: DELIVERY_TIERS_JSON
+        sync: false
+      - key: FREE_DELIVERY_MIN
+        value: "0"
       - key: JWT_ACCESS_TTL
         value: 900s
       - key: JWT_REFRESH_TTL
@@ -50,6 +72,16 @@ services:
         sync: false
       - key: MENU_CACHE_TTL_MS
         value: "60000"
+      - key: MENU_DB_TIMEOUT_MS
+        value: "4000"
+      - key: MENU_JSON_TTL_MS
+        value: "300000"
+      - key: MENU_JSON_PATH
+        sync: false
+      - key: DEBUG_MENU_LOAD
+        value: "false"
+      - key: DEBUG_MENU_TIMING
+        value: "false"
       - key: PREWARM_MENU
         value: "true"
       - key: HTTP_LOG
@@ -60,6 +92,8 @@ services:
         value: 200kb
       - key: PGCLIENTENCODING
         value: UTF8
+      - key: RECEIPT_EMAIL_TO
+        value: epicpizzaorders@gmail.com
       - key: PRINTER_HOST
         sync: false
       - key: PRINTER_PORT
@@ -72,10 +106,20 @@ services:
         sync: false
       - key: PRINTER_IPP_PATH
         sync: false
+      - key: PRINTER_FONT_PATH
+        sync: false
       - key: WINDOWS_PRINTER_NAME
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: COOK_TIMES_JSON
+        sync: false
+      - key: COOK_BASE_MIN
+        value: "5"
+      - key: COOK_PER_EXTRA_QTY_MIN
+        value: "2"
+      - key: COOK_PER_EXTRA_LINE_MIN
+        value: "1"
       - key: PROMPTPAY_MERCHANT_ID
         sync: false
       - key: PROMPTPAY_ACCOUNT_TYPE
@@ -83,6 +127,8 @@ services:
       - key: PROMPTPAY_WEBHOOK_SECRET
         sync: false
       - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
         sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
@@ -108,15 +154,37 @@ services:
         sync: false
       - key: GOOGLE_SHEETS_PRIVATE_KEY
         sync: false
+      - key: GOOGLE_SHEETS_ID
+        sync: false
+      - key: GOOGLE_SHEETS_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_SHEET_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+        sync: false
+      - key: ENABLE_SHEETS_PRINT_SHEET
+        value: "false"
+      - key: SHEETS_PRINT_SHEET_NAME
+        value: Print
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
         sync: false
       - key: TWILIO_FROM
         sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: WHATSAPP_DEFAULT_COUNTRY_CODE
+        value: "+66"
       - key: LINE_CHANNEL_ACCESS_TOKEN
         sync: false
+      - key: LINE_CHANNEL_ID
+        sync: false
       - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_OAUTH_CALLBACK_URL
         sync: false
       - key: OMISE_PUBLIC_KEY
         sync: false
@@ -124,6 +192,12 @@ services:
         sync: false
       - key: OMISE_WEBHOOK_ENDPOINT
         value: https://epicfoodorders.com/webhook/omise
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_CALLBACK_URL
+        sync: false
   
   - type: web
     name: epic-pizza-frontend
@@ -145,6 +219,41 @@ services:
         value: "13.8732674"
       - key: VITE_MAP_LNG
         value: "100.4807412"
+      - key: VITE_THAI_VAT_RATE
+        value: "0.07"
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: VITE_OMISE_PUBLIC_KEY
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: epic-pizza-admin
+    runtime: static
+    rootDir: Front-End
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm ci && npm run build
+    autoDeploy: true
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://api.epicfoodorders.com/api
+      - key: VITE_APP_NAME
+        value: "Epic Pizza Admin"
+      - key: VITE_IS_ADMIN
+        value: "true"
+      - key: VITE_RESTAURANT_LAT
+        value: "13.862800"
+      - key: VITE_RESTAURANT_LNG
+        value: "100.514900"
+      - key: VITE_MAP_LAT
+        value: "13.8732674"
+      - key: VITE_MAP_LNG
+        value: "100.4807412"
+      - key: VITE_THAI_VAT_RATE
+        value: "0.07"
       - key: VITE_GOOGLE_MAPS_API_KEY
         sync: false
       - key: VITE_OMISE_PUBLIC_KEY
