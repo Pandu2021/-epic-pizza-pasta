@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import CartDrawer from './CartDrawer';
 import Footer from './Footer';
 import ScrollTopButton from './ScrollTopButton';
+import AdminLink from './AdminLink';
 import { useCart } from '../store/cartStore';
 
 type Props = { children: ReactNode };
@@ -117,6 +118,7 @@ export default function Layout({ children }: Props) {
       </motion.main>
       <Footer />
       <ScrollTopButton />
+      <AdminLink />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   );

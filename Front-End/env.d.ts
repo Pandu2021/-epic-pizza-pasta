@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
   readonly VITE_APP_NAME: string;
+  readonly VITE_IS_ADMIN?: string;
+  readonly VITE_ADMIN_URL?: string;
   readonly VITE_MAP_LAT?: string;
   readonly VITE_MAP_LNG?: string;
   readonly VITE_OMISE_PUBLIC_KEY?: string;

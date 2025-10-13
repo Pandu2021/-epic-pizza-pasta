@@ -14,6 +14,7 @@ import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import * as express from 'express';
 import crypto from 'crypto';
+import { ensureBuiltInAdminAccounts } from './auth/admin-accounts';
 
 function cryptoRandomId() {
   return crypto.randomBytes(12).toString('hex');
@@ -159,6 +160,8 @@ async function bootstrap() {
     if (process.env.NODE_ENV !== 'production' && err?.stack) body.stack = err.stack;
     return res.status(status).json(body);
   });
+
+  await ensureBuiltInAdminAccounts();
 
   const port = Number(process.env.PORT || 4000);
   await app.listen(port);

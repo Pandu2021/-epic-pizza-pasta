@@ -74,7 +74,7 @@
 
 ## Auth
 - POST `/api/auth/register` — membuat akun, set cookie auth, dan kirim email verifikasi.
-- POST `/api/auth/login` — set cookie `access_token` dan `refresh_token` bila sukses.
+- POST `/api/auth/login` — Body: `{ email, password, context?: 'admin' }`; set cookie `access_token` & `refresh_token`. Jika `context==='admin'`, role wajib `admin|manager|staff`.
 - GET `/api/auth/me` — JWT required; detail profil saat ini.
 - POST `/api/auth/logout` — hapus cookie auth.
 - POST `/api/auth/refresh` — rotasi token menggunakan `refresh_token` cookie.
@@ -97,6 +97,7 @@ Notes:
 - GET `/api/admin/orders` — daftar pesanan (include items, payment)
 - GET `/api/admin/orders/:id` — detail pesanan
 - PATCH `/api/admin/orders/:id/status` — Body: `{ status: 'received|preparing|ready|delivering|completed|cancelled', driverName? }`
+- POST `/api/admin/orders/:id/receipt` — trigger cetak ulang struk (printer lokal)
 - GET `/api/admin/orders/metrics/summary` — ringkas metrik harian
 
 ### Menu (Admin)

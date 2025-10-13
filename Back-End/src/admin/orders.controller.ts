@@ -1,15 +1,19 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import { prisma } from '../prisma';
 import { enqueue } from '../utils/job-queue';
 import { updateOrderStatusInSheet } from '../utils/sheets';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
 import { AdminOrderStatusDto } from './dto/order.dto';
+import { OrdersService } from '../orders/orders.service';
+import { Request } from 'express';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 @Controller('api/admin/orders')
 export class AdminOrdersController {
+  constructor(@Inject(OrdersService) private readonly orders: OrdersService) {}
+
   @Get()
   list() {
     return prisma.order.findMany({ include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
@@ -41,6 +45,19 @@ export class AdminOrdersController {
       });
     }
     return updated;
+  }
+
+  @Post(':id/receipt')
+  async reprint(@Param('id') id: string, @Req() req: Request) {
+    const userId = ((req as any).user?.id as string | undefined) ?? 'admin-console';
+    try {
+      await this.orders.requestPrint(id, userId, true);
+      return { ok: true };
+    } catch (err: any) {
+      const status = err?.status || HttpStatus.BAD_REQUEST;
+      const message = err?.message || 'Failed to queue print job';
+      throw new HttpException(message, status);
+    }
   }
 
   @Get('metrics/summary')

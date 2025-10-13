@@ -8,6 +8,7 @@ import { sendEmail } from '../utils/email';
 import { sendWhatsAppMessage, sendLineMessage, maskPhone, maskLineId } from '../utils/messaging';
 import { createOAuthState, consumeOAuthState } from './oauth.state';
 import { google } from 'googleapis';
+import { ensureBuiltInAdminAccount, isBuiltInAdminEmail } from './admin-accounts';
 
 const CSRF_COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
@@ -515,7 +516,11 @@ export class AuthController {
   }
 
   @Post('login')
-    async login(@Body() body: { email: string; password: string }, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    async login(
+    @Body() body: { email: string; password: string; context?: 'admin' | 'customer' },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const email = (body.email || '').trim().toLowerCase();
 
       // Simple lockout: 5 failed attempts per 15 minutes per email+IP
@@ -530,6 +535,15 @@ export class AuthController {
       if (rec && now - rec.first < windowMs && rec.count >= maxAttempts) {
         (req as any)?.log?.warn({ email, ip, count: rec.count }, 'login lockout');
         throw new HttpException('Too many login attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+      }
+
+      const isAdminContext = (body.context || '').toLowerCase() === 'admin';
+      if (isAdminContext && isBuiltInAdminEmail(email)) {
+        try {
+          await ensureBuiltInAdminAccount(email);
+        } catch (seedErr: any) {
+          (req as any)?.log?.error({ email, seedErr }, 'failed to ensure built-in admin account');
+        }
       }
 
       const user = await prisma.user.findUnique({ where: { email } });
@@ -554,6 +568,18 @@ export class AuthController {
           ok: false,
           reason: 'email_not_verified',
         };
+      }
+
+      if (isAdminContext) {
+        if (!isBuiltInAdminEmail(email)) {
+          (req as any)?.log?.warn({ email, ip }, 'login blocked: email not in admin whitelist');
+          return { ok: false, reason: 'not_allowed' };
+        }
+        const allowed = new Set(['admin', 'manager', 'staff']);
+        if (!allowed.has((user.role || '').toLowerCase())) {
+          (req as any)?.log?.warn({ userId: user.id, email, ip, role: user.role }, 'login blocked: insufficient role for admin context');
+          return { ok: false, reason: 'insufficient_role' };
+        }
       }
 
       // success: reset counter

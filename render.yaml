@@ -211,6 +211,8 @@ services:
         value: https://api.epicfoodorders.com/api
       - key: VITE_APP_NAME
         value: Epic Pizza & Pasta
+      - key: VITE_ADMIN_URL
+        value: https://admin.epicfoodorders.com
       - key: VITE_RESTAURANT_LAT
         value: "13.862800"
       - key: VITE_RESTAURANT_LNG
@@ -244,6 +246,8 @@ services:
         value: "Epic Pizza Admin"
       - key: VITE_IS_ADMIN
         value: "true"
+      - key: VITE_ADMIN_URL
+        value: https://admin.epicfoodorders.com
       - key: VITE_RESTAURANT_LAT
         value: "13.862800"
       - key: VITE_RESTAURANT_LNG

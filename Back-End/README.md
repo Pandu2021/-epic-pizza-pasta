@@ -130,6 +130,7 @@ API default: http://localhost:4000
 Required env (subset):
 
 ```
+BUILT_IN_ADMIN_PASSWORD=Me4medigap!
 PORT=4000
 DATABASE_URL=postgresql://user:pass@localhost:5432/db
 JWT_PRIVATE_KEY=... (escaped PEM) 

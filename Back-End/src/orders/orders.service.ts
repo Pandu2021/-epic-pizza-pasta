@@ -457,13 +457,13 @@ export class OrdersService {
     return { id: order.id, status: order.status, ...eta };
   }
 
-  async requestPrint(orderId: string, requesterUserId: string) {
+  async requestPrint(orderId: string, requesterUserId: string, force = false) {
     const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true, phone: true } });
     if (!order) {
       const err: any = new Error('Order not found'); err.status = 404; throw err;
     }
     // Allow if owned by user or phone matches user's phone (legacy orders)
-    if (order.userId !== requesterUserId) {
+    if (!force && order.userId !== requesterUserId) {
       const user = await prisma.user.findUnique({ where: { id: requesterUserId }, select: { phone: true } });
       const userPhone = user?.phone ? normalizeThaiPhone(user.phone) : undefined;
       const orderPhone = order.phone ? normalizeThaiPhone(order.phone) : undefined;
