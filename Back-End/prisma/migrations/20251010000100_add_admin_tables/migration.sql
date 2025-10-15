@@ -1,0 +1,2 @@
+-- This migration intentionally left blank because admin endpoints rely on existing tables.
+-- Created to keep Prisma migration history in sync after admin module introduction.

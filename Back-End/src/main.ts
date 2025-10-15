@@ -1,4 +1,32 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { resolve, dirname, isAbsolute } from 'node:path';
+
+const defaultEnvFiles = ['.env', '.env.local'];
+const searchRoots = new Set<string>([process.cwd()]);
+
+if (typeof __dirname === 'string') {
+  searchRoots.add(resolve(__dirname, '..'));
+}
+
+const explicitEnvFile = process.env.APP_ENV_FILE;
+if (explicitEnvFile) {
+  const envPath = isAbsolute(explicitEnvFile) ? explicitEnvFile : resolve(process.cwd(), explicitEnvFile);
+  if (existsSync(envPath)) {
+    loadEnv({ path: envPath, override: true });
+  }
+}
+
+for (const root of searchRoots) {
+  for (const filename of defaultEnvFiles) {
+    const envPath = resolve(root, filename);
+    if (!existsSync(envPath)) continue;
+    loadEnv({ path: envPath, override: true });
+  }
+}
+
+process.env.PORT = process.env.PORT || '4000';
+
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -15,6 +43,7 @@ import type { Request, Response, NextFunction } from 'express';
 import * as express from 'express';
 import crypto from 'crypto';
 import { ensureBuiltInAdminAccounts } from './auth/admin-accounts';
+import { waitForDatabaseConnection } from './prisma';
 
 function cryptoRandomId() {
   return crypto.randomBytes(12).toString('hex');
@@ -160,6 +189,15 @@ async function bootstrap() {
     if (process.env.NODE_ENV !== 'production' && err?.stack) body.stack = err.stack;
     return res.status(status).json(body);
   });
+
+  try {
+    await waitForDatabaseConnection();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[bootstrap] Database connection failed. Ensure PostgreSQL is running and reachable at the configured DATABASE_URL.');
+    console.error(`[bootstrap] ${message}`);
+    process.exit(1);
+  }
 
   await ensureBuiltInAdminAccounts();
 
