@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 const HomePage = lazy(() => import('../pages/HomePage'));
 const MenuPage = lazy(() => import('../pages/MenuPage'));
 const CartPage = lazy(() => import('../pages/CartPage'));
+const CheckoutEntryPage = lazy(() => import('../pages/CheckoutEntryPage'));
 const CheckoutPage = lazy(() => import('../pages/CheckoutPage'));
 const ContactPage = lazy(() => import('../pages/ContactPage'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
@@ -39,6 +40,7 @@ export default function CustomerApp() {
             <Route path="/menu/pizza-super-sampler" element={<Navigate to="/menu" replace />} />
             <Route path="/menu/:id" element={<ProductPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout/start" element={<CheckoutEntryPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/admin" element={<Navigate to="/profile" replace />} />
             <Route path="/admin/*" element={<Navigate to="/profile" replace />} />

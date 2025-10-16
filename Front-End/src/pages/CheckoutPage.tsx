@@ -6,7 +6,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useCart } from '../store/cartStore';
 import { useAuth } from '../store/authStore';
 import { endpoints } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { rememberGuestSession, purgeExpiredGuestSessions } from '../utils/guestSession';
 
 const thPhone = z
   .string()
@@ -43,9 +44,12 @@ type FormValues = z.infer<typeof schema>;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { items, total, clear } = useCart();
   const { user, loading: authLoading, fetchMe } = useAuth();
   const mountedRef = useRef(false);
+  const [guestMode, setGuestMode] = useState(false);
+  const [activeGuestToken, setActiveGuestToken] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
@@ -91,6 +95,30 @@ export default function CheckoutPage() {
 
   const MIN_ORDER = 99;
   useEffect(() => {
+    purgeExpiredGuestSessions();
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    const params = new URLSearchParams(location.search);
+    const guestParam = (params.get('guest') || '').toLowerCase();
+    const guestSelected = ['1', 'true', 'yes', 'guest'].includes(guestParam);
+    if (user) {
+      setGuestMode(false);
+      setActiveGuestToken(null);
+      if (guestSelected) {
+        navigate('/checkout', { replace: true });
+      }
+      return;
+    }
+    if (guestSelected) {
+      setGuestMode(true);
+    } else {
+      navigate('/checkout/start', { replace: true });
+    }
+  }, [authLoading, location.search, navigate, user]);
+
+  useEffect(() => {
     if (omisePublicKey) return;
     (async () => {
       try {
@@ -124,16 +152,37 @@ export default function CheckoutPage() {
         paymentMethod: data.paymentMethod
       } as const;
 
-      const res = await endpoints.createOrder(payload);
-      const created = res.data as {
+      const useGuestFlow = !user && guestMode;
+      const res = await (useGuestFlow ? endpoints.createGuestOrder(payload) : endpoints.createOrder(payload));
+      type CreateResponse = {
         orderId: string;
         status: string;
         amountTotal: number;
-        subtotal: number; deliveryFee: number; tax: number; discount: number; expectedReadyAt?: string; expectedDeliveryAt?: string;
+        subtotal: number;
+        deliveryFee: number;
+        tax: number;
+        discount: number;
+        expectedReadyAt?: string;
+        expectedDeliveryAt?: string;
         payment?: { type: string; qrPayload?: string; status: string };
+        guestToken?: string;
+        expiresAt?: string;
       };
+      const created = res.data as CreateResponse;
+      if (!created.orderId) {
+        throw new Error('Order not created');
+      }
+      const tokenFromResponse = useGuestFlow ? created.guestToken ?? null : null;
+      if (useGuestFlow && tokenFromResponse) {
+        const expiresAt = typeof created.expiresAt === 'string' ? created.expiresAt : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+        rememberGuestSession({ orderId: created.orderId, token: tokenFromResponse, expiresAt });
+        setActiveGuestToken(tokenFromResponse);
+      }
+  const sessionToken = useGuestFlow ? (tokenFromResponse || activeGuestToken) : null;
       setOrderId(created.orderId);
       setBreakdown({ subtotal: created.subtotal, deliveryFee: created.deliveryFee, tax: created.tax, discount: created.discount, total: created.amountTotal, expectedReadyAt: created.expectedReadyAt, expectedDeliveryAt: created.expectedDeliveryAt });
+
+      const amountForPayment = created.amountTotal ?? effectiveBreakdown?.total ?? 0;
 
       // 2) Payment flow by method
       if (data.paymentMethod === 'promptpay') {
@@ -142,12 +191,12 @@ export default function CheckoutPage() {
         let qrImg: string | null = null;
         if (created.orderId) {
           try {
-            const r = await endpoints.createOmisePromptPay({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total });
+            const r = await endpoints.createOmisePromptPay({ orderId: created.orderId, amount: amountForPayment });
             qr = (r.data?.qrPayload as string) || null;
             qrImg = (r.data?.qrImageUrl as string) || null;
           } catch {
             // fallback to local payload
-            const qrRes = await endpoints.createPromptPay({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total });
+            const qrRes = await endpoints.createPromptPay({ orderId: created.orderId, amount: amountForPayment });
             qr = qrRes.data.qrPayload as string;
           }
         }
@@ -204,7 +253,7 @@ export default function CheckoutPage() {
         let ok = false;
         let failMsg: string | undefined;
         try {
-          const chargeRes = await endpoints.omiseCharge({ orderId: created.orderId, amount: created.amountTotal ?? effectiveBreakdown!.total, token });
+          const chargeRes = await endpoints.omiseCharge({ orderId: created.orderId, amount: amountForPayment, token });
           ok = !!chargeRes.data?.ok;
           if (!ok) failMsg = chargeRes.data?.message || 'Card charge failed. Please try another card.';
         } catch (err: any) {
@@ -212,17 +261,17 @@ export default function CheckoutPage() {
         }
         if (ok) {
           clear();
-          navigate(`/order-confirmation?orderId=${created.orderId}`);
+          navigate(`/order-confirmation?orderId=${created.orderId}${sessionToken ? `&guestToken=${encodeURIComponent(sessionToken)}` : ''}`);
         } else {
           const msg = failMsg || 'Card charge failed. Please try another card.';
-          navigate(`/payment-failed?orderId=${created.orderId}&message=${encodeURIComponent(msg)}`);
+          navigate(`/payment-failed?orderId=${created.orderId}${sessionToken ? '&mode=guest' : ''}&message=${encodeURIComponent(msg)}`);
         }
       } else if (data.paymentMethod === 'cod') {
         // No online payment, show simple confirmation
         setQrPayload(null);
         if (created.orderId) {
           clear();
-          navigate(`/order-confirmation?orderId=${created.orderId}`);
+          navigate(`/order-confirmation?orderId=${created.orderId}${sessionToken ? `&guestToken=${encodeURIComponent(sessionToken)}` : ''}`);
         }
       }
 
@@ -235,7 +284,7 @@ export default function CheckoutPage() {
             if (st.data.status === 'paid') {
               if (pollRef.current) window.clearInterval(pollRef.current);
               clear();
-              navigate(`/order-confirmation?orderId=${created.orderId}`);
+              navigate(`/order-confirmation?orderId=${created.orderId}${sessionToken ? `&guestToken=${encodeURIComponent(sessionToken)}` : ''}`);
             }
           } catch {
             // ignore transient errors
@@ -264,11 +313,6 @@ export default function CheckoutPage() {
       try { await fetchMe(); } catch {}
     })();
   }, []);
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate(`/login?next=${encodeURIComponent('/checkout')}`);
-    }
-  }, [authLoading, user, navigate]);
 
   // Redirect if cart emptied (after mount) and no order in progress
   useEffect(() => {
@@ -278,7 +322,7 @@ export default function CheckoutPage() {
   }, [items.length, creating, orderId, navigate]);
   useEffect(() => { mountedRef.current = true; }, []);
 
-  if (authLoading || (!user && !authLoading)) {
+  if (authLoading) {
     return (
       <section className="py-10" aria-labelledby="checkout-heading" {...(authLoading ? { 'aria-busy': true } as any : {})}>
         <h1 id="checkout-heading" className="text-xl font-semibold mb-4">Checkout</h1>
@@ -299,6 +343,18 @@ export default function CheckoutPage() {
           {creating ? 'Submitting order…' : 'Form ready'}
         </p>
         <h1 id="checkout-heading" className="text-xl font-semibold">Checkout</h1>
+        {!user && guestMode && (
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
+            <p className="text-gray-700">Guest checkout active. We will issue a secure session token after you place the order. Sessions expire automatically after two hours.</p>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => navigate('/checkout/start')}
+            >
+              Change Checkout Method
+            </button>
+          </div>
+        )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {previewBreakdown && previewBreakdown.subtotal < MIN_ORDER && (
           <p className="text-xs text-amber-600">Add THB {MIN_ORDER - previewBreakdown.subtotal} more to reach the minimum order.</p>

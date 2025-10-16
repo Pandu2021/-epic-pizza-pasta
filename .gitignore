@@ -1,6 +1,8 @@
 # Root ignore
 # Node & build artifacts
 tmp/
+# Backend temp workspace (scratch env overrides, generated tests)
+Back-End/tmp/
 *.log
 npm-debug.log*
 yarn-debug.log*

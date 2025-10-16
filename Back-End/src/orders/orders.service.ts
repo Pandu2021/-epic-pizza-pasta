@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 // Prisma namespace types avoided here to simplify build in test env
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildPromptPayPayload } from '../utils/promptpay';
@@ -21,6 +22,115 @@ export class OrdersService {
   ) {}
   // In-memory guard to avoid duplicate Google Sheets appends per order id (process lifetime)
   private appendedOrderIds = new Set<string>();
+  private useLegacyPaymentInsert = false;
+  private useLegacyPaymentSelect = false;
+
+  private isMissingVerifiedByColumn(err: unknown) {
+    if (!err) return false;
+    const code = (err as any)?.code;
+    if (code === '42703') return true; // postgres undefined_column
+    const columnName = (err as any)?.meta?.column_name || (err as any)?.meta?.columnName;
+    if (typeof columnName === 'string' && columnName.toLowerCase().includes('verifiedbyid')) {
+      return true;
+    }
+    const message = String((err as any)?.message || '').toLowerCase();
+    return message.includes('verifiedbyid');
+  }
+
+  private async createPaymentRecord(data: { orderId: string; method: string; status: string; promptpayQR?: string | null; providerRefId?: string | null }) {
+    if (this.useLegacyPaymentInsert) {
+      await this.insertPaymentWithoutVerifiedBy(data);
+      return;
+    }
+    try {
+      await prisma.payment.create({ data });
+    } catch (err) {
+      if (this.isMissingVerifiedByColumn(err)) {
+        // eslint-disable-next-line no-console
+        console.warn('[orders.create] payment table missing verifiedById; switching to legacy insert');
+        this.useLegacyPaymentInsert = true;
+        await this.insertPaymentWithoutVerifiedBy(data);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  private async insertPaymentWithoutVerifiedBy(data: { orderId: string; method: string; status: string; promptpayQR?: string | null; providerRefId?: string | null }) {
+    const promptpayQR = data.promptpayQR ?? null;
+    const providerRefId = data.providerRefId ?? null;
+    const id = randomUUID();
+    const now = new Date();
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO "Payment" ("id", "orderId", "method", "status", "promptpayQR", "providerRefId", "createdAt", "updatedAt")
+        VALUES (${id}, ${data.orderId}, ${data.method}, ${data.status}, ${promptpayQR}, ${providerRefId}, ${now}, ${now})
+      `;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[orders.create] legacy payment insert failed:', (err as any)?.message || err);
+      throw err;
+    }
+  }
+
+  private async fetchPayment(orderId: string) {
+    if (!orderId) return null;
+    if (this.useLegacyPaymentSelect) {
+      return this.fetchPaymentLegacy(orderId);
+    }
+    try {
+      return await prisma.payment.findUnique({ where: { orderId } });
+    } catch (err) {
+      if (this.isMissingVerifiedByColumn(err)) {
+        // eslint-disable-next-line no-console
+        console.warn('[orders] payment select missing verifiedById; switching to legacy select');
+        this.useLegacyPaymentSelect = true;
+        return this.fetchPaymentLegacy(orderId);
+      }
+      throw err;
+    }
+  }
+
+  private async fetchPaymentLegacy(orderId: string) {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT "id", "orderId", "method", "status", "promptpayQR", "providerRefId", "paidAt", "createdAt", "updatedAt"
+        FROM "Payment"
+        WHERE "orderId" = ${orderId}
+        LIMIT 1
+      `;
+      if (Array.isArray(rows) && rows.length) {
+        const row = rows[0];
+        return {
+          id: row.id,
+          orderId: row.orderId,
+          method: row.method,
+          status: row.status,
+          promptpayQR: row.promptpayQR ?? null,
+          providerRefId: row.providerRefId ?? null,
+          paidAt: row.paidAt ?? null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      }
+      return null;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[orders] legacy payment select failed:', (err as any)?.message || err);
+      throw err;
+    }
+  }
+
+  private async attachPayment<T extends { id: string; payment?: any }>(order: T | null) {
+    if (!order) return order;
+    const payment = await this.fetchPayment(order.id);
+    return { ...order, payment } as T & { payment: any };
+  }
+
+  private async attachPayments<T extends { id: string; payment?: any }>(orders: T[]) {
+    if (!orders.length) return orders;
+    return Promise.all(orders.map(async (order) => ({ ...order, payment: await this.fetchPayment(order.id) })));
+  }
 
   async ensurePhoneAccess(phone: string | undefined, user: { id: string; role?: string } | undefined) {
     if (!user?.id) {
@@ -68,7 +178,8 @@ export class OrdersService {
   }
   async listByPhone(phone: string) {
     const normalized = normalizeThaiPhone(phone);
-    return prisma.order.findMany({ where: { phone: normalized }, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
+    const orders = await prisma.order.findMany({ where: { phone: normalized }, include: { items: true }, orderBy: { createdAt: 'desc' } });
+    return this.attachPayments(orders);
   }
   async listForUser(userId: string) {
     // Primary: orders explicitly linked to userId
@@ -78,7 +189,8 @@ export class OrdersService {
     const where = phone
       ? { OR: [ { userId }, { userId: null, phone } ] }
       : { userId };
-    return prisma.order.findMany({ where, include: { items: true, payment: true }, orderBy: { createdAt: 'desc' } });
+    const orders = await prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: 'desc' } });
+    return this.attachPayments(orders);
   }
   async create(dto: CreateOrderDto, userId?: string) {
     const pricing = computePricing({
@@ -235,17 +347,15 @@ export class OrdersService {
       // eslint-disable-next-line no-console
       console.warn('[orders.create] prisma.payment.create missing; skipping payment row create');
     }
-    if (hasPaymentCreate) {
+    if (hasPaymentCreate || this.useLegacyPaymentInsert) {
       // eslint-disable-next-line no-console
       console.log('[orders.create] creating payment row');
       try {
-        await prisma.payment.create({
-          data: {
-            orderId: created.id,
-            method: dto.paymentMethod,
-            status: dto.paymentMethod === 'promptpay' ? 'pending' : 'unpaid',
-            promptpayQR,
-          },
+        await this.createPaymentRecord({
+          orderId: created.id,
+          method: dto.paymentMethod,
+          status: dto.paymentMethod === 'promptpay' ? 'pending' : 'unpaid',
+          promptpayQR,
         });
       } catch (pe: unknown) {
         // eslint-disable-next-line no-console
@@ -343,17 +453,18 @@ export class OrdersService {
   }
 
   async get(id: string) {
-    return prisma.order.findUnique({
+    const order = await prisma.order.findUnique({
       where: { id },
-      include: { items: true, payment: true },
+      include: { items: true },
     });
+    return this.attachPayment(order);
   }
 
   async cancel(id: string) {
     const order = await prisma.order.update({ where: { id }, data: { status: 'cancelled' } });
     // Attempt refund if payment exists and is pending/unpaid
     try {
-      const payment = await prisma.payment.findUnique({ where: { orderId: id } });
+  const payment = await this.fetchPayment(id);
       if (payment && ['pending','unpaid'].includes(payment.status)) {
         await prisma.payment.update({ where: { orderId: id }, data: { status: 'refunded', paidAt: null as any } });
         await prisma.webhookEvent.create({ data: { type: 'payment.refund.simulated', payload: { orderId: id } as any } });

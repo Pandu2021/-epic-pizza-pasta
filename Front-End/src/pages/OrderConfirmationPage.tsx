@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { endpoints, api } from '../services/api';
 import { computeProgress, shouldAutoConfirm } from '../utils/tracking';
 import PizzaCarProgress from '../components/PizzaCarProgress';
+import { findGuestSession, purgeExpiredGuestSessions } from '../utils/guestSession';
 
 // Small helper for status badge styling (aligned with ProfilePage semantics)
 function statusClasses(status?: string) {
@@ -18,7 +19,9 @@ function statusClasses(status?: string) {
 
 export default function OrderConfirmationPage() {
   const { search } = useLocation();
-  const queryOrderId = new URLSearchParams(search).get('orderId');
+  const params = new URLSearchParams(search);
+  const queryOrderId = params.get('orderId');
+  const queryGuestToken = params.get('guestToken');
   // Resolve orderId: from query if present, else pick the latest in-flight order from user's history
   const [resolvedOrderId, setResolvedOrderId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState(true);
@@ -34,57 +37,121 @@ export default function OrderConfirmationPage() {
   const autoTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const guestPollRef = useRef<number | null>(null);
+  const [guestToken, setGuestToken] = useState<string | null>(() => queryGuestToken);
 
   // Resolve order id if missing
   useEffect(() => {
     let ignore = false;
+    purgeExpiredGuestSessions();
     (async () => {
       setResolvingId(true);
       if (queryOrderId && queryOrderId.trim().length > 0) {
-        if (!ignore) setResolvedOrderId(queryOrderId);
+        if (!ignore) {
+          setResolvedOrderId(queryOrderId);
+          if (!guestToken) {
+            const session = findGuestSession({ orderId: queryOrderId, token: queryGuestToken || undefined });
+            if (session) setGuestToken(session.token);
+            else if (queryGuestToken) setGuestToken(queryGuestToken);
+          }
+        }
         setResolvingId(false);
         return;
       }
-      // Fallback: try to pick active order from my orders
+
+      const session = findGuestSession(queryGuestToken ? { token: queryGuestToken } : undefined);
+      if (session) {
+        if (!ignore) {
+          setResolvedOrderId(session.orderId);
+          setGuestToken(session.token);
+        }
+        setResolvingId(false);
+        return;
+      }
+
+      // Fallback: try to pick active order from authenticated history
       try {
         const { data: list } = await endpoints.myOrders();
-         const arr = Array.isArray(list) ? list : [];
+        const arr = Array.isArray(list) ? list : [];
         const active = [...arr]
-          .filter((o: any) => !['delivered','cancelled'].includes(String(o.status || '').toLowerCase()))
-          .sort((a: any,b: any) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-        const latest = active || arr.sort((a: any,b: any) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-        if (!ignore) setResolvedOrderId(latest?.id || null);
-      } catch {
+          .filter((o: any) => !['delivered', 'cancelled'].includes(String(o.status || '').toLowerCase()))
+          .sort((a: any, b: any) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+        const latest = active || arr.sort((a: any, b: any) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+        if (!ignore) {
+          setResolvedOrderId(latest?.id || null);
+          setGuestToken(null);
+        }
+      } catch (err: any) {
         if (!ignore) setResolvedOrderId(null);
       } finally {
-        setResolvingId(false);
+        if (!ignore) setResolvingId(false);
       }
     })();
-    return () => { ignore = true };
-  }, [queryOrderId]);
+    return () => {
+      ignore = true;
+    };
+  }, [queryOrderId, queryGuestToken]);
 
   useEffect(() => {
     let ignore = false;
+    const token = guestToken || queryGuestToken || null;
     (async () => {
-      if (!resolvedOrderId) { setError('Missing order id'); return; }
-      setLoading(true); setError(null);
+      if (!resolvedOrderId) {
+        setError('Missing order id');
+        return;
+      }
+      setLoading(true);
+      setError(null);
       try {
-        const res = await endpoints.getOrder(resolvedOrderId);
-        if (!ignore) {
-          setOrder(res.data);
-          setStatus(res.data?.status);
-          setDelivered(res.data?.status === 'delivered');
-          setCancelled(res.data?.status === 'cancelled');
+        if (token) {
+          const res = await endpoints.getGuestOrder(token);
+          if (!ignore) {
+            setOrder(res.data);
+            const st = String(res.data?.status || '').toLowerCase();
+            setStatus(res.data?.status || null);
+            setDelivered(st === 'delivered');
+            setCancelled(st === 'cancelled');
+            const expected = res.data?.expectedDeliveryAt ? Date.parse(res.data.expectedDeliveryAt) : undefined;
+            if (expected) setEta({ expectedDeliveryAt: expected });
+          }
+        } else {
+          const res = await endpoints.getOrder(resolvedOrderId);
+          if (!ignore) {
+            setOrder(res.data);
+            setStatus(res.data?.status);
+            setDelivered(res.data?.status === 'delivered');
+            setCancelled(res.data?.status === 'cancelled');
+          }
         }
-      } catch {
+      } catch (err: any) {
         if (!ignore) setError('Failed to load order');
-      } finally { if (!ignore) setLoading(false); }
-      // fetch initial eta (best-effort)
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+
+      if (token) {
+        if (guestPollRef.current) window.clearInterval(guestPollRef.current);
+        guestPollRef.current = window.setInterval(async () => {
+          try {
+            const res = await endpoints.getGuestOrder(token);
+            const st = String(res.data?.status || '').toLowerCase();
+            setOrder((prev: any) => ({ ...(prev || {}), ...res.data }));
+            setStatus(res.data?.status || null);
+            setDelivered(st === 'delivered');
+            setCancelled(st === 'cancelled');
+          } catch {
+            // ignore polling errors
+          }
+        }, 8000) as unknown as number;
+        return;
+      }
+
+      // fetch initial eta (best-effort) for authenticated users
       try {
         const etaRes = await api.get(`/orders/${resolvedOrderId}/eta`);
         if (!ignore && etaRes.data) setEta({ readyMinutes: etaRes.data.readyMinutes, deliveryMinutes: etaRes.data.deliveryMinutes, expectedDeliveryAt: etaRes.data.expectedDeliveryAt ? Date.parse(etaRes.data.expectedDeliveryAt) : undefined });
       } catch {}
-      // open SSE for live updates
+      // open SSE for live updates (authenticated only)
       try {
         const base = api.defaults.baseURL || '';
         const url = base.replace(/\/$/, '') + `/orders/${resolvedOrderId}/stream`;
@@ -120,10 +187,11 @@ export default function OrderConfirmationPage() {
           // ignore close errors
         }
       }
+      if (guestPollRef.current) window.clearInterval(guestPollRef.current);
       if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current);
       if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
     };
-  }, [resolvedOrderId]);
+  }, [resolvedOrderId, guestToken, queryGuestToken]);
 
   // Progress animation loop
   useEffect(() => {
@@ -171,7 +239,8 @@ export default function OrderConfirmationPage() {
     </div>
   ) : null;
 
-  const showActions = !delivered && !cancelled && !loading && !resolvingId && !!resolvedOrderId;
+  const guestView = Boolean(guestToken || queryGuestToken);
+  const showActions = !guestView && !delivered && !cancelled && !loading && !resolvingId && !!resolvedOrderId;
   const readyOrDeliveryText = eta && (eta.readyMinutes || eta.deliveryMinutes) ? (
     <p className="mt-1 text-xs text-gray-500">
       {eta.readyMinutes !== undefined && `Ready in ~${eta.readyMinutes} min`}
@@ -194,6 +263,9 @@ export default function OrderConfirmationPage() {
       {resolvedOrderId && (
         <p className="mt-2 text-sm text-gray-600">Order ID: <span className="font-mono">{resolvedOrderId}</span></p>
       )}
+      {guestView && guestToken && (
+        <p className="mt-2 text-xs text-gray-500">Guest session token: <span className="font-mono break-all">{guestToken}</span></p>
+      )}
       {!resolvedOrderId && !loading && !resolvingId && (
         <p className="mt-2 text-sm text-red-600">Order ID tidak ditemukan. Silakan kembali ke Profil untuk memilih pesanan aktif.</p>
       )}
@@ -204,9 +276,14 @@ export default function OrderConfirmationPage() {
             {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClasses(status)}`}>{status}</span>}
           </div>
           <ul className="mt-3 space-y-1 text-sm text-gray-700">
-            {order.items?.map((it: any) => (
-              <li key={it.id} className="flex justify-between gap-4"><span>{it.qty} × {it.nameSnapshot}</span><span className="tabular-nums">THB {it.priceSnapshot}</span></li>
-            ))}
+            {order.items?.map((it: any, idx: number) => {
+              const name = it.nameSnapshot || it.name || `Item ${idx + 1}`;
+              const price = Number(it.priceSnapshot ?? it.price ?? 0);
+              const key = it.id || `${name}-${idx}`;
+              return (
+                <li key={key} className="flex justify-between gap-4"><span>{it.qty} × {name}</span><span className="tabular-nums">THB {price}</span></li>
+              );
+            })}
           </ul>
           <div className="mt-4 border-t pt-3 space-y-1 text-right text-sm">
             <div>Subtotal: THB {order.subtotal}</div>

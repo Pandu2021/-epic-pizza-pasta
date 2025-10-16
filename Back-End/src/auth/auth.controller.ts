@@ -397,14 +397,30 @@ export class AuthController {
     }
 
     const passwordHash = await argon2.hash(password);
+    const verifiedAt = new Date();
+    const baseCreateData = {
+      email,
+      passwordHash,
+      name,
+      phone,
+      lineUserId,
+      emailVerifiedAt: verifiedAt,
+    };
     let user: Awaited<ReturnType<typeof prisma.user.create>>;
     try {
-      user = await prisma.user.create({ data: { email, passwordHash, name, phone, lineUserId } });
+      user = await prisma.user.create({ data: baseCreateData });
     } catch (err: any) {
       if (shouldRetryWithoutLineUserId(err)) {
         // eslint-disable-next-line no-console
         console.warn('[auth] user table missing lineUserId column; retrying registration without LINE linkage');
-        user = await prisma.user.create({ data: { email, passwordHash, name, phone } });
+        const fallbackData = {
+          email,
+          passwordHash,
+          name,
+          phone,
+          emailVerifiedAt: verifiedAt,
+        };
+        user = await prisma.user.create({ data: fallbackData });
       } else if (err?.code === 'P2002') {
         if (isUniqueLineUserIdError(err)) {
           throw new ConflictException('LINE ID already in use');
@@ -416,38 +432,27 @@ export class AuthController {
         throw err;
       }
     }
-    const emailVerified = Boolean((user as any).emailVerifiedAt);
+    const emailVerified = true;
 
-      let verificationExpiresAt: Date | null = null;
-      let verificationEmailQueued = false;
-      try {
-        const { token, expiresAt } = await auth.generateEmailVerificationToken(user.id);
-        verificationExpiresAt = expiresAt;
-  await sendVerificationEmail({ id: user.id, email: user.email, name: user.name }, token, expiresAt);
-        verificationEmailQueued = true;
-      } catch (err: any) {
-        // eslint-disable-next-line no-console
-        console.error('[auth] failed to queue verification email', err?.message || err);
-      }
-
-      // Backward compatibility: include id at top-level; new shape under user + ok flag
-      return {
-        ok: true,
+    return {
+      ok: true,
+      id: user.id,
+      user: {
         id: user.id,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name ?? undefined,
-          phone: user.phone ?? undefined,
-          lineUserId: user.lineUserId ?? undefined,
-          role: user.role,
-          emailVerified,
-        },
-        verification: {
-          emailSent: verificationEmailQueued,
-          expiresAt: verificationExpiresAt ? verificationExpiresAt.toISOString() : null,
-        },
-      };
+        email: user.email,
+        name: user.name ?? undefined,
+        phone: user.phone ?? undefined,
+        lineUserId: user.lineUserId ?? undefined,
+        role: user.role,
+        emailVerified,
+      },
+      verification: {
+        autoVerified: true,
+        verifiedAt: verifiedAt.toISOString(),
+        emailSent: false,
+        expiresAt: null,
+      },
+    };
   }
 
   @Get('verify-email')
@@ -546,14 +551,13 @@ export class AuthController {
         }
       }
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      let user = await prisma.user.findUnique({ where: { email } });
       if (!user) {
         const r = rec && now - rec.first < windowMs ? { count: rec.count + 1, first: rec.first } : { count: 1, first: now };
         store.set(key, r);
         (req as any)?.log?.warn({ email, ip, count: r.count }, 'login failed: user not found');
         return { ok: false };
       }
-      const emailVerified = Boolean((user as any).emailVerifiedAt);
       const ok = await argon2.verify(user.passwordHash, body.password);
       if (!ok) {
         const r = rec && now - rec.first < windowMs ? { count: rec.count + 1, first: rec.first } : { count: 1, first: now };
@@ -561,14 +565,15 @@ export class AuthController {
         (req as any)?.log?.warn({ userId: user.id, email, ip, count: r.count }, 'login failed: bad password');
         return { ok: false };
       }
-      if (!emailVerified) {
-        store.delete(key);
-        (req as any)?.log?.warn({ userId: user.id, email, ip }, 'login blocked: email not verified');
-        return {
-          ok: false,
-          reason: 'email_not_verified',
-        };
+      if (!(user as any).emailVerifiedAt) {
+        try {
+          user = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+          (req as any)?.log?.info({ userId: user.id, email, ip }, 'login auto-verified email');
+        } catch (updateErr: any) {
+          (req as any)?.log?.warn({ userId: user.id, email, ip, updateErr }, 'login auto-verification failed');
+        }
       }
+      const emailVerified = Boolean((user as any).emailVerifiedAt);
 
       if (isAdminContext) {
         if (!isBuiltInAdminEmail(email)) {
@@ -607,7 +612,7 @@ export class AuthController {
         phone: user.phone ?? undefined,
         lineUserId: user.lineUserId ?? undefined,
         role: user.role,
-          emailVerified,
+        emailVerified,
       },
     };
   }
@@ -891,6 +896,10 @@ export class AuthController {
         attempts: deliveries,
       },
     };
+    const anyQueued = deliveries.some((attempt) => attempt.status === 'queued');
+    if (rawToken && !anyQueued) {
+      response.resetToken = rawToken;
+    }
     if (!isProduction && rawToken) {
       response.devToken = rawToken;
     }

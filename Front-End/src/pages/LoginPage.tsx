@@ -1,13 +1,22 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialSuccessEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail || '';
+  const [successEmail] = useState(initialSuccessEmail);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialSuccessEmail) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [initialSuccessEmail, navigate, location.pathname]);
 
   const onSubmit = async (_event: React.FormEvent) => {
     _event.preventDefault();
@@ -16,13 +25,6 @@ export default function LoginPage() {
     try {
       const payload = { email: email.trim().toLowerCase(), password };
       const { data } = await api.post('/auth/login', payload);
-      if (data?.reason === 'email_not_verified') {
-        navigate('/verify-email/check', {
-          replace: true,
-          state: { email: payload.email },
-        });
-        return;
-      }
       if (data?.ok) {
         navigate('/profile', { replace: true });
       } else {
@@ -39,6 +41,11 @@ export default function LoginPage() {
     <section className="max-w-md mx-auto">
       <h1 className="text-2xl font-bold">Login</h1>
       <p className="text-slate-600 mt-1">Please sign in to continue.</p>
+      {successEmail && (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          Account <span className="font-medium">{successEmail}</span> is ready. You can sign in right away.
+        </div>
+      )}
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
         <div>
           <label className="text-sm" htmlFor="email">Email</label>
@@ -60,25 +67,6 @@ export default function LoginPage() {
         <div className="flex-1 h-px bg-slate-200" />
       </div>
       <div className="grid grid-cols-1 gap-3">
-        <button
-          type="button"
-          className="btn-outline w-full flex items-center justify-center gap-3"
-          onClick={() => {
-            const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000/api';
-            const redirect = encodeURIComponent(window.location.origin + '/profile');
-            window.location.href = `${apiBase}/auth/google?redirect=${redirect}`;
-          }}
-        >
-          <span className="flex items-center justify-center h-8 w-8 rounded-full shadow-sm bg-white">
-            <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6 1.53 7.38 2.81l5.4-5.26C33.66 3.64 29.26 1.5 24 1.5 14.62 1.5 6.51 7.44 3.44 15.69l6.89 5.35C11.55 13.99 17.21 9.5 24 9.5z" />
-              <path fill="#4285F4" d="M46.5 24.5c0-1.64-.15-3.22-.44-4.75H24v9.01h12.7c-.55 2.86-2.21 5.28-4.7 6.91l7.19 5.59C43.88 37.43 46.5 31.39 46.5 24.5z" />
-              <path fill="#FBBC05" d="M10.33 28.96a14.5 14.5 0 0 1-.76-4.46c0-1.55.27-3.05.74-4.46l-6.89-5.35C1.66 17.54 0.5 20.93 0.5 24.5s1.16 6.96 3.42 9.81l6.41-5.35z" />
-              <path fill="#34A853" d="M24 47.5c6.26 0 11.52-2.06 15.36-5.59l-7.19-5.59c-2.02 1.36-4.63 2.17-8.17 2.17-6.79 0-12.45-4.49-14.67-10.54l-6.89 5.35C6.51 41.56 14.62 47.5 24 47.5z" />
-            </svg>
-          </span>
-          <span className="font-medium">Continue with Google</span>
-        </button>
         <button
           type="button"
           className="btn-outline w-full flex items-center justify-center gap-3"

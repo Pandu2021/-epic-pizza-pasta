@@ -78,7 +78,7 @@ export default function CartPage() {
                           </button>
                           <input
                             type="number"
-                            value={it.qty}
+                            onClick={() => navigate('/checkout/start')}
                             onChange={(e) => {
                               const val = Math.max(1, Number(e.target.value) || 1);
                               updateQty(it.id, val);
@@ -138,7 +138,7 @@ export default function CartPage() {
               <button
                 type="button"
                 className="btn-primary w-full"
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate('/checkout/start')}
               >
                 {t('cart_page.proceed_checkout')}
               </button>

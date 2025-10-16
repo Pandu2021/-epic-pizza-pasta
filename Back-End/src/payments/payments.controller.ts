@@ -11,6 +11,113 @@ import { enqueue } from '../utils/job-queue';
 @Controller('api')
 export class PaymentsController {
   constructor(private readonly printer: OrdersPrintService) {}
+  private useLegacyPaymentSelect = false;
+
+  private isMissingVerifiedByColumn(err: unknown) {
+    if (!err) return false;
+    const code = (err as any)?.code;
+    if (code === '42703') return true;
+    const columnName = (err as any)?.meta?.column_name || (err as any)?.meta?.columnName;
+    if (typeof columnName === 'string' && columnName.toLowerCase().includes('verifiedbyid')) {
+      return true;
+    }
+    const message = String((err as any)?.message || '').toLowerCase();
+    return message.includes('verifiedbyid');
+  }
+
+  private async fetchPaymentByOrderId(orderId: string) {
+    if (!orderId) return null;
+    if (this.useLegacyPaymentSelect) {
+      return this.fetchPaymentByOrderIdLegacy(orderId);
+    }
+    try {
+      return await prisma.payment.findUnique({ where: { orderId } });
+    } catch (err) {
+      if (this.isMissingVerifiedByColumn(err)) {
+        // eslint-disable-next-line no-console
+        console.warn('[payments] payment select missing verifiedById; switching to legacy select');
+        this.useLegacyPaymentSelect = true;
+        return this.fetchPaymentByOrderIdLegacy(orderId);
+      }
+      throw err;
+    }
+  }
+
+  private async fetchPaymentByProviderRef(providerRefId: string) {
+    if (!providerRefId) return null;
+    if (this.useLegacyPaymentSelect) {
+      return this.fetchPaymentByProviderRefLegacy(providerRefId);
+    }
+    try {
+      return await prisma.payment.findFirst({ where: { providerRefId } });
+    } catch (err) {
+      if (this.isMissingVerifiedByColumn(err)) {
+        this.useLegacyPaymentSelect = true;
+        return this.fetchPaymentByProviderRefLegacy(providerRefId);
+      }
+      throw err;
+    }
+  }
+
+  private async fetchPaymentByOrderIdLegacy(orderId: string) {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT "id", "orderId", "method", "status", "promptpayQR", "providerRefId", "paidAt", "createdAt", "updatedAt"
+        FROM "Payment"
+        WHERE "orderId" = ${orderId}
+        LIMIT 1
+      `;
+      if (Array.isArray(rows) && rows.length) {
+        const row = rows[0];
+        return {
+          id: row.id,
+          orderId: row.orderId,
+          method: row.method,
+          status: row.status,
+          promptpayQR: row.promptpayQR ?? null,
+          providerRefId: row.providerRefId ?? null,
+          paidAt: row.paidAt ?? null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      }
+      return null;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[payments] legacy payment select failed:', (err as any)?.message || err);
+      throw err;
+    }
+  }
+
+  private async fetchPaymentByProviderRefLegacy(providerRefId: string) {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT "id", "orderId", "method", "status", "promptpayQR", "providerRefId", "paidAt", "createdAt", "updatedAt"
+        FROM "Payment"
+        WHERE "providerRefId" = ${providerRefId}
+        LIMIT 1
+      `;
+      if (Array.isArray(rows) && rows.length) {
+        const row = rows[0];
+        return {
+          id: row.id,
+          orderId: row.orderId,
+          method: row.method,
+          status: row.status,
+          promptpayQR: row.promptpayQR ?? null,
+          providerRefId: row.providerRefId ?? null,
+          paidAt: row.paidAt ?? null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      }
+      return null;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[payments] legacy payment select by provider failed:', (err as any)?.message || err);
+      throw err;
+    }
+  }
 
   @Get('payments/config')
   getConfig() {
@@ -52,8 +159,10 @@ export class PaymentsController {
     if (!secret) throw new HttpException('Omise not configured', HttpStatus.SERVICE_UNAVAILABLE);
     if (!body?.orderId) throw new HttpException('Invalid request', HttpStatus.BAD_REQUEST);
 
-    const order = await prisma.order.findUnique({ where: { id: body.orderId }, include: { payment: true } });
+  const order = await prisma.order.findUnique({ where: { id: body.orderId } });
     if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+  const existingPayment = await this.fetchPaymentByOrderId(order.id);
+  (order as any).payment = existingPayment;
 
     const amountSatang = Math.round(((body.amount ?? order.total ?? 0) as number) * 100);
     if (amountSatang <= 0) throw new HttpException('Amount must be > 0', HttpStatus.BAD_REQUEST);
@@ -179,7 +288,7 @@ export class PaymentsController {
 
   @Get('payments/:orderId/status')
   async status(@Param('orderId') orderId: string) {
-    const pay = await prisma.payment.findUnique({ where: { orderId } });
+    const pay = await this.fetchPaymentByOrderId(orderId);
     return { orderId, status: pay?.status ?? 'unknown', paidAt: pay?.paidAt ?? null };
   }
 
@@ -197,8 +306,10 @@ export class PaymentsController {
     }
 
     const order = await prisma.order.findUnique({ where: { id: body.orderId }, include: { payment: true } });
-    if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
-    if (order.payment?.status === 'paid') return { ok: true, alreadyPaid: true };
+  if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+  const currentPayment = await this.fetchPaymentByOrderId(order.id);
+  (order as any).payment = currentPayment;
+  if (currentPayment?.status === 'paid') return { ok: true, alreadyPaid: true };
 
     const amountSatang = Math.round((body.amount || order.total || 0) * 100);
     if (amountSatang <= 0) throw new HttpException('Amount must be > 0', HttpStatus.BAD_REQUEST);
@@ -358,10 +469,18 @@ export class PaymentsController {
         if (paid) {
           let payment = null;
           if (orderIdMeta) {
-            payment = await prisma.payment.findUnique({ where: { orderId: orderIdMeta } }).catch(() => null);
+            try {
+              payment = await this.fetchPaymentByOrderId(orderIdMeta);
+            } catch {
+              payment = null;
+            }
           }
           if (!payment && chargeId) {
-            payment = await prisma.payment.findFirst({ where: { providerRefId: chargeId } }).catch(() => null);
+            try {
+              payment = await this.fetchPaymentByProviderRef(chargeId);
+            } catch {
+              payment = null;
+            }
           }
           if (payment) {
             await prisma.payment.update({

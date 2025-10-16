@@ -50,7 +50,7 @@ export default function CartDrawer({ open, onClose }: Props) {
             <div>{t('total')}</div>
             <div>฿ {total().toFixed(0)}</div>
           </div>
-          <Link to="/checkout" className="btn-primary w-full mt-3 inline-flex justify-center" onClick={onClose}>
+          <Link to="/checkout/start" className="btn-primary w-full mt-3 inline-flex justify-center" onClick={onClose}>
             {t('checkout')}
           </Link>
         </div>

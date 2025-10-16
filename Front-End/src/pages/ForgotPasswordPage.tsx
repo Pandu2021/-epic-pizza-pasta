@@ -108,6 +108,7 @@ export default function ForgotPasswordPage() {
   const [manualForm, setManualForm] = useState({ name: '', phone: '', details: '' });
   const [notice, setNotice] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<DeliverySummary | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const getChannelFallbackNotice = (method: Channel) => {
     switch (method) {
@@ -206,6 +207,25 @@ export default function ForgotPasswordPage() {
   const resendLabel = resendCooldown > 0
     ? `Resend available in ${resendCooldown}s`
     : 'Resend email';
+            {resetToken && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                <p className="font-semibold">Reset token ready</p>
+                <p className="mt-1 text-emerald-700">
+                  We couldn’t confirm delivery, so here’s your secure token. Paste it on the reset form or jump straight in below.
+                </p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <code className="flex-1 rounded border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800 break-all">
+                    {resetToken}
+                  </code>
+                  <Link
+                    to={`/reset-password?token=${encodeURIComponent(resetToken)}`}
+                    className="btn-primary sm:w-auto"
+                  >
+                    Reset now
+                  </Link>
+                </div>
+              </div>
+            )}
   const deliveryIssueNotice = getDeliveryIssueNotice(primaryAttempt);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,6 +239,7 @@ export default function ForgotPasswordPage() {
       setMaskedEmail(data?.email || maskEmail(normalized));
       setExpiresInMinutes(data?.expiresInMinutes ?? 30);
       setDelivery((data?.delivery as DeliverySummary | null) ?? null);
+      setResetToken(data?.resetToken ?? null);
       setView('sent');
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       const issueNotice = getDeliveryIssueNotice((data?.delivery as DeliverySummary | null)?.attempts?.[0]);
@@ -230,6 +251,7 @@ export default function ForgotPasswordPage() {
       setExpiresInMinutes(expiresInMinutes ?? 30);
       setView('sent');
       setDelivery(null);
+      setResetToken(null);
       setNotice(getChannelFallbackNotice('email'));
       setError(null);
       console.warn('[forgot-password] fallback flow triggered', err);
@@ -247,12 +269,14 @@ export default function ForgotPasswordPage() {
       setMaskedEmail(data?.email || maskEmail(submittedEmail));
       setExpiresInMinutes(data?.expiresInMinutes ?? expiresInMinutes ?? 30);
       setDelivery((data?.delivery as DeliverySummary | null) ?? null);
+      setResetToken(data?.resetToken ?? resetToken);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       const issueNotice = getDeliveryIssueNotice((data?.delivery as DeliverySummary | null)?.attempts?.[0]);
       setNotice(issueNotice);
     } catch (err) {
       setMaskedEmail(maskEmail(submittedEmail));
       setDelivery(null);
+      setResetToken(resetToken);
       setNotice(getChannelFallbackNotice('email'));
       setError(null);
       console.warn('[forgot-password] resend fallback flow triggered', err);
@@ -307,6 +331,7 @@ export default function ForgotPasswordPage() {
     setResendCooldown(0);
     setNotice(null);
     setDelivery(null);
+    setResetToken(null);
   };
 
   const manualSuccessMessage = manualStatus === 'success' ? 'Thanks! Our team will reach out using the details you shared.' : null;

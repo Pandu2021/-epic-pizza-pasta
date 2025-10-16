@@ -20,11 +20,10 @@ export default function RegisterPage() {
       const payload = { email: email.trim().toLowerCase(), password, name };
       const { data } = await api.post('/auth/register', payload);
       if (data?.ok) {
-        navigate('/verify-email/check', {
+        navigate('/login', {
           replace: true,
           state: {
-            email: payload.email,
-            verification: data?.verification ?? null,
+            registeredEmail: payload.email,
           },
         });
         return;

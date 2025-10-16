@@ -9,12 +9,32 @@ import fs from 'node:fs'
 import { sendEmail } from '../utils/email'
 import { buildApiUrl } from '../utils/env'
 import { Roles, RolesGuard } from '../common/guards/roles.guard';
+import { GuestOrdersService } from './guest-orders.service';
 
 @Controller('api/orders')
 export class OrdersController {
-  constructor(@Inject(OrdersService) private readonly orders: OrdersService, @Inject(OrdersEvents) private readonly events: OrdersEvents) {
+  constructor(
+    @Inject(OrdersService) private readonly orders: OrdersService,
+    @Inject(OrdersEvents) private readonly events: OrdersEvents,
+    @Inject(GuestOrdersService) private readonly guestOrders: GuestOrdersService,
+  ) {
     // eslint-disable-next-line no-console
-    console.log('[orders.controller] constructed; orders injected =', !!this.orders);
+    console.log('[orders.controller] constructed; orders injected =', !!this.orders, 'guestOrders =', !!this.guestOrders);
+  }
+
+  @Post('guest')
+  async createGuest(@Body() dto: CreateOrderDto) {
+    const sanitized = this.sanitizeOrderDto(dto);
+    const result = await this.guestOrders.createGuestOrder(sanitized);
+    return {
+      guestToken: result.guestToken,
+      ...result.summary,
+    };
+  }
+
+  @Get('guest/:token')
+  async getGuest(@Param('token') token: string) {
+    return this.guestOrders.getGuestOrder(token);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -31,14 +51,13 @@ export class OrdersController {
   @Post()
   async create(@Body() dto: CreateOrderDto, @Req() req: Request) {
     console.log('[orders.controller] create (auth required) called; user =', (req as any).user?.id);
+    const sanitized = this.sanitizeOrderDto(dto);
     try {
-    const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
-    const order = await this.orders.create(dto, userId);
-    const orderId = order?.id;
-    const receiptUrl = orderId ? buildApiUrl(`/orders/${orderId}/receipt.pdf`) : undefined;
+  const userId = (req as any).user?.id as string; // enforced by JwtAuthGuard
+  const order = await this.orders.create(sanitized, userId);
       // If customer provided an email in the order DTO, enqueue sending receipt PDF to them.
       try {
-        const custEmail = (dto as any)?.customer?.email as string | undefined;
+        const custEmail = sanitized.customer?.email as string | undefined;
         const orderIdForEmail = order?.id;
         if (custEmail && orderIdForEmail) {
           const receiptPdfUrl = buildApiUrl(`/orders/${orderIdForEmail}/receipt.pdf`);
@@ -60,23 +79,7 @@ export class OrdersController {
       } catch (e) {
         // swallow errors
       }
-      return {
-        orderId,
-        status: order?.status,
-        amountTotal: order?.total,
-        tax: order?.tax,
-        deliveryFee: order?.deliveryFee,
-        subtotal: order?.subtotal,
-        discount: order?.discount,
-        expectedReadyAt: (order as any)?.expectedReadyAt,
-        expectedDeliveryAt: (order as any)?.expectedDeliveryAt,
-        receiptUrl,
-        payment: order?.payment && {
-          type: order.payment.method,
-          qrPayload: order.payment.promptpayQR,
-          status: order.payment.status,
-        },
-      };
+      return this.buildOrderResponse(order);
     } catch (e: any) {
       // Prisma known error mapping
       const code = e?.code as string | undefined;
@@ -85,8 +88,8 @@ export class OrdersController {
       const safe = {
         code,
         msg,
-        items: Array.isArray((dto as any)?.items) ? (dto as any).items.length : undefined,
-        paymentMethod: (dto as any)?.paymentMethod,
+        items: Array.isArray(sanitized.items) ? sanitized.items.length : undefined,
+        paymentMethod: sanitized.paymentMethod,
       };
       console.error('[orders.create] error:', safe);
       if (e?.stack) {
@@ -205,5 +208,69 @@ export class OrdersController {
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() body: { status: string; driverName?: string }) {
     return this.orders.updateStatus(id, body.status, body.driverName);
+  }
+
+  private sanitizeOrderDto(dto: CreateOrderDto): CreateOrderDto {
+    const cleanString = (value: string | undefined | null) => {
+      if (typeof value !== 'string') return undefined;
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      const cleaned = trimmed.replace(/[\u0000-\u001F\u007F<>]/g, '').trim();
+      return cleaned.length ? cleaned : '';
+    };
+    const requireNonEmpty = (value: string | undefined | null, fallback: string) => {
+      const sanitized = cleanString(value);
+      if (sanitized && sanitized.length) return sanitized;
+      const fallbackSanitized = cleanString(fallback);
+      if (fallbackSanitized && fallbackSanitized.length) return fallbackSanitized;
+      return fallback;
+    };
+    const cleanPhone = (value: string) => value.replace(/[^\d+]/g, '');
+    return {
+      customer: {
+        name: requireNonEmpty(dto.customer.name, 'Guest'),
+        email: dto.customer.email ? dto.customer.email.trim().toLowerCase() : undefined,
+        phone: cleanPhone(dto.customer.phone),
+        address: cleanString(dto.customer.address) || undefined,
+        lat: typeof dto.customer.lat === 'number' ? dto.customer.lat : undefined,
+        lng: typeof dto.customer.lng === 'number' ? dto.customer.lng : undefined,
+      },
+      items: dto.items.map((item) => ({
+        id: requireNonEmpty(item.id, item.id),
+        name: requireNonEmpty(item.name, item.name),
+        email: item.email ? item.email.trim().toLowerCase() : undefined,
+        qty: item.qty,
+        price: item.price,
+        options: item.options ? JSON.parse(JSON.stringify(item.options)) : undefined,
+      })),
+      delivery: {
+        type: dto.delivery.type,
+        distanceKm: typeof dto.delivery.distanceKm === 'number' ? dto.delivery.distanceKm : undefined,
+        fee: typeof dto.delivery.fee === 'number' ? dto.delivery.fee : undefined,
+      },
+      paymentMethod: dto.paymentMethod,
+    };
+  }
+
+  private buildOrderResponse(order: any) {
+    const orderId = order?.id;
+    const receiptUrl = orderId ? buildApiUrl(`/orders/${orderId}/receipt.pdf`) : undefined;
+    return {
+      orderId,
+      status: order?.status,
+      amountTotal: order?.total,
+      tax: order?.tax,
+      deliveryFee: order?.deliveryFee,
+      subtotal: order?.subtotal,
+      discount: order?.discount,
+      expectedReadyAt: order?.expectedReadyAt,
+      expectedDeliveryAt: order?.expectedDeliveryAt,
+      receiptUrl,
+      payment: order?.payment && {
+        type: order.payment.method,
+        qrPayload: order.payment.promptpayQR,
+        status: order.payment.status,
+      },
+    };
   }
 }

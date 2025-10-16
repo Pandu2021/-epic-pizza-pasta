@@ -1,0 +1,2 @@
+-- Intentionally left empty; placeholder migration to keep sequence consistent.
+-- No schema changes are required yet for guest token support.
