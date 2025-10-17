@@ -796,16 +796,41 @@ export class AuthController {
         <p style="margin:32px 0 0;">If you didn’t request this, you can safely ignore this email.</p>
         <p style="margin:16px 0 0;color:#475569;">Stay saucy,<br/>Epic Pizza & Pasta</p>
       </body></html>`;
-      try {
-        await sendEmail({ to: email, subject, text: plain, html });
+      const configuredTimeout = Number(process.env.PASSWORD_RESET_EMAIL_TIMEOUT_MS || process.env.EMAIL_SEND_TIMEOUT_MS || 0);
+      const sendTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 4500;
+      const emailSendTask = sendEmail({ to: email, subject, text: plain, html });
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<{ status: 'timeout' }>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve({ status: 'timeout' }), sendTimeoutMs);
+      });
+      const outcome = await Promise.race([
+        emailSendTask.then(
+          () => ({ status: 'sent' as const }),
+          (err: any) => ({ status: 'error' as const, error: err })
+        ),
+        timeoutPromise,
+      ]);
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      if (outcome.status === 'sent') {
         emailDelivery.status = 'queued';
-      } catch (err: any) {
+      } else if (outcome.status === 'error') {
         emailDelivery.status = 'error';
         if (!isProduction) {
-          emailDelivery.devNote = err?.message || String(err);
+          emailDelivery.devNote = outcome.error?.message || String(outcome.error);
         }
         // eslint-disable-next-line no-console
-        console.error('[auth] failed to send reset email', err?.message || err);
+        console.error('[auth] failed to send reset email', outcome.error?.message || outcome.error);
+      } else {
+        emailDelivery.status = 'queued';
+        if (!isProduction) {
+          emailDelivery.devNote = `Email delivery pending beyond ${sendTimeoutMs}ms; continuing in background.`;
+        }
+        emailSendTask.catch((err: any) => {
+          // eslint-disable-next-line no-console
+          console.error('[auth] failed to send reset email after timeout', err?.message || err);
+        });
       }
 
       const altBody = [

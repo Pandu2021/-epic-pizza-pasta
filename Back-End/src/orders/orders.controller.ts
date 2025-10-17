@@ -10,6 +10,7 @@ import { sendEmail } from '../utils/email'
 import { buildApiUrl } from '../utils/env'
 import { Roles, RolesGuard } from '../common/guards/roles.guard';
 import { GuestOrdersService } from './guest-orders.service';
+import { GuestVerificationService } from './guest-verification.service';
 
 @Controller('api/orders')
 export class OrdersController {
@@ -17,9 +18,34 @@ export class OrdersController {
     @Inject(OrdersService) private readonly orders: OrdersService,
     @Inject(OrdersEvents) private readonly events: OrdersEvents,
     @Inject(GuestOrdersService) private readonly guestOrders: GuestOrdersService,
+    @Inject(GuestVerificationService) private readonly guestVerification: GuestVerificationService,
   ) {
     // eslint-disable-next-line no-console
     console.log('[orders.controller] constructed; orders injected =', !!this.orders, 'guestOrders =', !!this.guestOrders);
+  }
+
+  @Post('guest/verification/request')
+  async requestGuestVerification(@Body() body: { channel?: 'email' | 'phone'; target?: string }) {
+    const channel = body?.channel;
+    const target = body?.target;
+    if (!channel || !target) {
+      throw new BadRequestException('channel and target are required');
+    }
+    if (channel !== 'email' && channel !== 'phone') {
+      throw new BadRequestException('Unsupported verification channel');
+    }
+    const result = await this.guestVerification.request({ channel, target });
+    return result;
+  }
+
+  @Post('guest/verification/confirm')
+  async confirmGuestVerification(@Body() body: { requestId?: string; code?: string }) {
+    const requestId = (body?.requestId || '').trim();
+    const code = (body?.code || '').trim();
+    if (!requestId || !code) {
+      throw new BadRequestException('requestId and code are required');
+    }
+    return this.guestVerification.confirm({ requestId, code });
   }
 
   @Post('guest')
@@ -249,6 +275,7 @@ export class OrdersController {
         fee: typeof dto.delivery.fee === 'number' ? dto.delivery.fee : undefined,
       },
       paymentMethod: dto.paymentMethod,
+      verificationToken: typeof dto.verificationToken === 'string' && dto.verificationToken.trim().length ? dto.verificationToken.trim() : undefined,
     };
   }
 

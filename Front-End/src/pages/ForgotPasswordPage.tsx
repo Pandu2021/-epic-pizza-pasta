@@ -207,25 +207,6 @@ export default function ForgotPasswordPage() {
   const resendLabel = resendCooldown > 0
     ? `Resend available in ${resendCooldown}s`
     : 'Resend email';
-            {resetToken && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                <p className="font-semibold">Reset token ready</p>
-                <p className="mt-1 text-emerald-700">
-                  We couldn’t confirm delivery, so here’s your secure token. Paste it on the reset form or jump straight in below.
-                </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <code className="flex-1 rounded border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800 break-all">
-                    {resetToken}
-                  </code>
-                  <Link
-                    to={`/reset-password?token=${encodeURIComponent(resetToken)}`}
-                    className="btn-primary sm:w-auto"
-                  >
-                    Reset now
-                  </Link>
-                </div>
-              </div>
-            )}
   const deliveryIssueNotice = getDeliveryIssueNotice(primaryAttempt);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -253,6 +234,7 @@ export default function ForgotPasswordPage() {
       setDelivery(null);
       setResetToken(null);
       setNotice(getChannelFallbackNotice('email'));
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       setError(null);
       console.warn('[forgot-password] fallback flow triggered', err);
     } finally {
@@ -278,6 +260,7 @@ export default function ForgotPasswordPage() {
       setDelivery(null);
       setResetToken(resetToken);
       setNotice(getChannelFallbackNotice('email'));
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       setError(null);
       console.warn('[forgot-password] resend fallback flow triggered', err);
     } finally {
@@ -432,6 +415,26 @@ export default function ForgotPasswordPage() {
             {(notice || deliveryIssueNotice) && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 {deliveryIssueNotice || notice}
+              </div>
+            )}
+
+            {resetToken && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                <p className="font-semibold">Reset token ready</p>
+                <p className="mt-1 text-emerald-700">
+                  We couldn’t confirm delivery, so here’s your secure token. Paste it on the reset form or jump straight in below.
+                </p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <code className="flex-1 break-all rounded border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800">
+                    {resetToken}
+                  </code>
+                  <Link
+                    to={`/reset-password?token=${encodeURIComponent(resetToken)}`}
+                    className="btn-primary sm:w-auto"
+                  >
+                    Reset now
+                  </Link>
+                </div>
               </div>
             )}
 

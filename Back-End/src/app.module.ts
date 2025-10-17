@@ -16,6 +16,7 @@ import { EstimateController } from './estimate/estimate.controller';
 import { AuthController } from './auth/auth.controller';
 import { GuestOrdersService } from './orders/guest-orders.service';
 import { GuestOrdersCleanupMiddleware } from './orders/guest-orders.cleanup.middleware';
+import { GuestVerificationService } from './orders/guest-verification.service';
 
 @Module({
   imports: [
@@ -75,7 +76,7 @@ import { GuestOrdersCleanupMiddleware } from './orders/guest-orders.cleanup.midd
     EstimateController,
     AuthController,
   ],
-  providers: [OrdersService, OrdersEvents, OrdersPrintService, GuestOrdersService, GuestOrdersCleanupMiddleware],
+  providers: [OrdersService, OrdersEvents, OrdersPrintService, GuestOrdersService, GuestOrdersCleanupMiddleware, GuestVerificationService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
