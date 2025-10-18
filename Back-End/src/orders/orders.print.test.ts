@@ -23,6 +23,7 @@ describe('OrdersPrintService', () => {
       paymentMethod: 'cod',
       items: [ { nameSnapshot: 'Pizza', qty: 1, priceSnapshot: 100 } ],
     } as any)
+    vi.spyOn(prisma.payment as any, 'findUnique').mockResolvedValue(null)
 
     // Spy on print functions
     const pdfSpy = vi.spyOn(printerPdf, 'printPdfTo').mockResolvedValue()

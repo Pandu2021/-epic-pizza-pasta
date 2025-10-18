@@ -7,10 +7,11 @@ import { prisma } from '../prisma';
 import { OrdersPrintService } from '../orders/orders.print';
 import { sendEmail } from '../utils/email';
 import { enqueue } from '../utils/job-queue';
+import { OrdersNotificationService } from '../orders/orders.notification';
 
 @Controller('api')
 export class PaymentsController {
-  constructor(private readonly printer: OrdersPrintService) {}
+  constructor(private readonly printer: OrdersPrintService, private readonly notifications: OrdersNotificationService) {}
   private useLegacyPaymentSelect = false;
 
   private isMissingVerifiedByColumn(err: unknown) {
@@ -305,7 +306,10 @@ export class PaymentsController {
       throw new HttpException('Invalid request', HttpStatus.BAD_REQUEST);
     }
 
-    const order = await prisma.order.findUnique({ where: { id: body.orderId }, include: { payment: true } });
+    const order = await prisma.order.findUnique({
+      where: { id: body.orderId },
+      include: { payment: true, User: { select: { email: true, lineUserId: true, name: true } } },
+    });
   if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
   const currentPayment = await this.fetchPaymentByOrderId(order.id);
   (order as any).payment = currentPayment;
@@ -406,6 +410,21 @@ export class PaymentsController {
         maxRetries: 3,
         baseDelayMs: 1000,
       });
+
+      const notifyOrder = {
+        ...order,
+        status: 'preparing',
+        payment: {
+          ...(order.payment || {}),
+          status: 'paid',
+          method: 'card',
+        },
+      } as any;
+      void this.notifications.notifyPaymentUpdate(notifyOrder, {
+        paymentStatus: 'paid',
+        paymentMethod: 'card',
+      });
+      void this.notifications.notifyOrderStatus(notifyOrder);
     }
 
     return { ok: paid, chargeId, status };
@@ -515,6 +534,27 @@ export class PaymentsController {
               maxRetries: 3,
               baseDelayMs: 1000,
             });
+
+            const notifyOrder = await prisma.order.findUnique({
+              where: { id: payment.orderId },
+              include: { payment: true, User: { select: { email: true, lineUserId: true, name: true } } },
+            });
+            if (notifyOrder) {
+              const paymentMethod = notifyOrder.payment?.method || notifyOrder.paymentMethod || 'promptpay';
+              const merged = {
+                ...notifyOrder,
+                payment: {
+                  ...(notifyOrder.payment || {}),
+                  status: 'paid',
+                  method: paymentMethod,
+                },
+              } as any;
+              void this.notifications.notifyPaymentUpdate(merged, {
+                paymentStatus: 'paid',
+                paymentMethod,
+              });
+              void this.notifications.notifyOrderStatus(merged);
+            }
           }
         }
       }
@@ -572,6 +612,27 @@ export class PaymentsController {
         maxRetries: 3,
         baseDelayMs: 1000,
       });
+
+      const notifyOrder = await prisma.order.findUnique({
+        where: { id: payload.orderId },
+        include: { payment: true, User: { select: { email: true, lineUserId: true, name: true } } },
+      });
+      if (notifyOrder) {
+        const paymentMethod = notifyOrder.payment?.method || notifyOrder.paymentMethod || 'promptpay';
+        const merged = {
+          ...notifyOrder,
+          payment: {
+            ...(notifyOrder.payment || {}),
+            status: 'paid',
+            method: paymentMethod,
+          },
+        } as any;
+        void this.notifications.notifyPaymentUpdate(merged, {
+          paymentStatus: 'paid',
+          paymentMethod,
+        });
+        void this.notifications.notifyOrderStatus(merged);
+      }
     }
 
     return { ok: true };

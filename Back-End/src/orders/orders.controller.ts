@@ -14,6 +14,8 @@ import { GuestVerificationService } from './guest-verification.service';
 
 @Controller('api/orders')
 export class OrdersController {
+  private readonly requireGuestVerification = process.env.GUEST_VERIFICATION_REQUIRED !== 'false';
+
   constructor(
     @Inject(OrdersService) private readonly orders: OrdersService,
     @Inject(OrdersEvents) private readonly events: OrdersEvents,
@@ -31,8 +33,8 @@ export class OrdersController {
     if (!channel || !target) {
       throw new BadRequestException('channel and target are required');
     }
-    if (channel !== 'email' && channel !== 'phone') {
-      throw new BadRequestException('Unsupported verification channel');
+    if (channel !== 'email') {
+      throw new BadRequestException('Phone/WhatsApp verification is temporarily disabled. Please choose email.');
     }
     const result = await this.guestVerification.request({ channel, target });
     return result;
@@ -51,7 +53,18 @@ export class OrdersController {
   @Post('guest')
   async createGuest(@Body() dto: CreateOrderDto) {
     const sanitized = this.sanitizeOrderDto(dto);
-    const result = await this.guestOrders.createGuestOrder(sanitized);
+    if (this.requireGuestVerification && !sanitized.customer.email) {
+      throw new BadRequestException('Guest checkout requires a verified email address.');
+    }
+    const verification = this.guestVerification.consumeToken(sanitized.verificationToken, {
+      email: sanitized.customer.email,
+      phone: sanitized.customer.phone,
+    });
+    if (this.requireGuestVerification && !verification) {
+      throw new BadRequestException('Guest verification required before placing order. Please complete OTP verification.');
+    }
+    delete (sanitized as any).verificationToken;
+    const result = await this.guestOrders.createGuestOrder(sanitized, { verification });
     return {
       guestToken: result.guestToken,
       ...result.summary,
@@ -252,12 +265,17 @@ export class OrdersController {
       return fallback;
     };
     const cleanPhone = (value: string) => value.replace(/[^\d+]/g, '');
+    const cleanLine = (value: string | undefined | null) => {
+      const sanitized = cleanString(value);
+      return sanitized && sanitized.length ? sanitized : undefined;
+    };
     return {
       customer: {
         name: requireNonEmpty(dto.customer.name, 'Guest'),
         email: dto.customer.email ? dto.customer.email.trim().toLowerCase() : undefined,
         phone: cleanPhone(dto.customer.phone),
         address: cleanString(dto.customer.address) || undefined,
+        lineId: cleanLine(dto.customer.lineId),
         lat: typeof dto.customer.lat === 'number' ? dto.customer.lat : undefined,
         lng: typeof dto.customer.lng === 'number' ? dto.customer.lng : undefined,
       },

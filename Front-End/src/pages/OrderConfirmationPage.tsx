@@ -275,6 +275,12 @@ export default function OrderConfirmationPage() {
             <h2 className="font-semibold">Summary</h2>
             {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClasses(status)}`}>{status}</span>}
           </div>
+          {order.verification && order.verification.channel && (
+            <p className="mt-2 text-xs text-emerald-600">
+              Contact verified via {order.verification.channel} at{' '}
+              {new Date(order.verification.verifiedAt).toLocaleString()}
+            </p>
+          )}
           <ul className="mt-3 space-y-1 text-sm text-gray-700">
             {order.items?.map((it: any, idx: number) => {
               const name = it.nameSnapshot || it.name || `Item ${idx + 1}`;

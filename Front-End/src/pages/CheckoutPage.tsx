@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +8,7 @@ import { useAuth } from '../store/authStore';
 import { endpoints } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { rememberGuestSession, purgeExpiredGuestSessions } from '../utils/guestSession';
+import CaptchaGate from '../components/CaptchaGate';
 
 const thPhone = z
   .string()
@@ -20,6 +21,13 @@ const schema = z
   .object({
     name: z.string().min(1),
     phone: thPhone,
+    email: z
+      .string()
+      .optional()
+      .transform((value) => (value || '').trim())
+      .refine((value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value), {
+        message: 'Please enter a valid email address if provided',
+      }),
     // Address required only when delivery
     address: z.string().optional(),
     deliveryMethod: z.enum(['delivery', 'pickup']),
@@ -61,18 +69,52 @@ export default function CheckoutPage() {
     return pk || null;
   });
   const pollRef = useRef<number | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaRefreshKey, setCaptchaRefreshKey] = useState(0);
+  const captchaSiteKey = (import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined) || null;
+  const requireCaptcha = Boolean(captchaSiteKey);
+  const [verificationRequestId, setVerificationRequestId] = useState<string | null>(null);
+  const [verificationExpiry, setVerificationExpiry] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'sending' | 'code-sent' | 'verifying' | 'verified'>('idle');
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(Date.now());
+  const resetVerificationState = useCallback(() => {
+    setVerificationStatus('idle');
+    setVerificationRequestId(null);
+    setVerificationExpiry(null);
+    setVerificationToken(null);
+    setVerificationCode('');
+    setVerificationMessage(null);
+    setVerificationError(null);
+    setVerifiedEmail(null);
+  }, []);
+  const verificationSecondsRemaining = useMemo(() => {
+    if (verificationStatus !== 'code-sent' || !verificationExpiry) return null;
+    const expires = Date.parse(verificationExpiry);
+    if (!Number.isFinite(expires)) return null;
+    return Math.ceil((expires - nowMs) / 1000);
+  }, [nowMs, verificationExpiry, verificationStatus]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { deliveryMethod: 'delivery', paymentMethod: 'promptpay' } });
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { deliveryMethod: 'delivery', paymentMethod: 'promptpay', email: '' },
+  });
 
   // Raw cart subtotal (without delivery/tax)
   const cartSubtotal = useMemo(() => total(), [total]);
   const deliveryMethod = watch('deliveryMethod');
   const paymentMethod = watch('paymentMethod');
+  const emailValue = watch('email');
+  const normalizedEmail = useMemo(() => (emailValue || '').trim().toLowerCase(), [emailValue]);
 
   // Local preview breakdown BEFORE order is created (mirrors backend logic simplified)
   const previewBreakdown = useMemo(() => {
@@ -97,6 +139,46 @@ export default function CheckoutPage() {
   useEffect(() => {
     purgeExpiredGuestSessions();
   }, []);
+
+  useEffect(() => {
+    if (!guestMode) {
+      resetVerificationState();
+      if (requireCaptcha) {
+        setCaptchaToken(null);
+        setCaptchaRefreshKey((key) => key + 1);
+      }
+    }
+  }, [guestMode, resetVerificationState, requireCaptcha]);
+
+  useEffect(() => {
+    if (verificationStatus !== 'code-sent') {
+      return;
+    }
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationStatus]);
+
+  useEffect(() => {
+    if (verificationStatus !== 'code-sent') return;
+    if (verificationSecondsRemaining !== null && verificationSecondsRemaining <= 0) {
+      resetVerificationState();
+      setVerificationError('Verification code expired. Please request a new code.');
+    }
+  }, [verificationSecondsRemaining, verificationStatus, resetVerificationState]);
+
+  useEffect(() => {
+    if (verificationStatus !== 'verified' || !verifiedEmail) return;
+    if (!normalizedEmail || normalizedEmail !== verifiedEmail) {
+      resetVerificationState();
+    }
+  }, [normalizedEmail, verificationStatus, verifiedEmail, resetVerificationState]);
+
+  useEffect(() => {
+    if (!guestMode || user) return;
+    if (!normalizedEmail) {
+      resetVerificationState();
+    }
+  }, [guestMode, user, normalizedEmail, resetVerificationState]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -131,29 +213,132 @@ export default function CheckoutPage() {
     })();
   }, [omisePublicKey]);
 
+  const handleSendVerification = useCallback(async () => {
+    if (!guestMode || user) return;
+    const channel: 'email' = 'email';
+    const target = normalizedEmail;
+    setVerificationError(null);
+    setVerificationMessage(null);
+    if (verificationStatus === 'sending') return;
+    if (!target) {
+      setVerificationError('Please enter an email address before requesting verification.');
+      return;
+    }
+    if (requireCaptcha && !captchaToken) {
+      setVerificationError('Complete the captcha before requesting a verification code.');
+      return;
+    }
+    try {
+      setVerificationStatus('sending');
+      const { data } = await endpoints.requestGuestVerification({ channel, target }, captchaToken || undefined);
+      setVerificationRequestId(data?.requestId || null);
+      setVerificationExpiry(data?.expiresAt || null);
+      setVerificationStatus('code-sent');
+      setVerificationMessage('Verification code sent via email.');
+      setVerificationToken(null);
+      setVerifiedEmail(null);
+      setVerificationCode('');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to send verification code.';
+      setVerificationError(msg);
+      setVerificationStatus('idle');
+    } finally {
+      if (requireCaptcha) {
+        setCaptchaToken(null);
+        setCaptchaRefreshKey((key) => key + 1);
+      }
+    }
+  }, [guestMode, user, normalizedEmail, verificationStatus, requireCaptcha, captchaToken]);
+
+  const handleConfirmVerification = useCallback(async () => {
+    if (!guestMode || user) return;
+    if (!verificationRequestId) {
+      setVerificationError('Request a verification code first.');
+      return;
+    }
+    const trimmedCode = verificationCode.trim();
+    if (!trimmedCode) {
+      setVerificationError('Enter the verification code you received.');
+      return;
+    }
+    try {
+      setVerificationError(null);
+      setVerificationStatus('verifying');
+      const res = await endpoints.confirmGuestVerification({ requestId: verificationRequestId, code: trimmedCode });
+      const payload = res.data as { verificationToken?: string; expiresAt?: string };
+      if (!payload?.verificationToken) {
+        throw new Error('Verification token missing from response');
+      }
+      const channel: 'email' = 'email';
+      const target = normalizedEmail;
+      if (!target) {
+        setVerificationError('Enter your email address before confirming verification.');
+        setVerificationStatus('code-sent');
+        return;
+      }
+      setVerificationToken(payload.verificationToken);
+      setVerificationStatus('verified');
+      setVerificationMessage('Contact verified successfully.');
+      setVerifiedEmail(target);
+      setVerificationCode('');
+      setVerificationExpiry(payload?.expiresAt || null);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Verification failed. Please double check the code.';
+      setVerificationError(msg);
+      setVerificationStatus('code-sent');
+    }
+  }, [guestMode, user, verificationRequestId, verificationCode, normalizedEmail]);
+
   const onSubmit = async (data: FormValues) => {
     setError(null);
     if (items.length === 0) {
       setError('Your cart is empty.');
       return;
     }
+    if (!user && guestMode) {
+      if (!verificationToken) {
+        setError('Complete contact verification before placing an order.');
+        return;
+      }
+      if (requireCaptcha && !captchaToken) {
+        setError('Complete the captcha challenge before placing the order.');
+        return;
+      }
+    }
     if (previewBreakdown && previewBreakdown.subtotal < MIN_ORDER) {
       setError(`Minimum order is THB ${MIN_ORDER}. Add more items.`);
       return;
     }
     if (creating) return;
+    const useGuestFlow = !user && guestMode;
+    const emailNormalized = (data.email || '').trim().toLowerCase();
+    if (useGuestFlow && !emailNormalized) {
+      setError('Guest checkout requires a valid email address for OTP verification.');
+      return;
+    }
     try {
       setCreating(true);
       // 1) Create order in backend
       const payload = {
-        customer: { name: data.name.trim(), phone: data.phone.replace(/[\s-]/g,'') , address: (data.address || '').trim() || undefined },
+        customer: {
+          name: data.name.trim(),
+          phone: data.phone.replace(/[\s-]/g, ''),
+          email: emailNormalized || undefined,
+          address: (data.address || '').trim() || undefined,
+        },
         items: items.map((it) => ({ id: it.id, name: it.name, qty: Math.round(it.qty), price: Math.round(it.price), options: it.options ?? undefined })),
         delivery: { type: data.deliveryMethod, fee: data.deliveryMethod === 'delivery' ? 39 : 0 },
-        paymentMethod: data.paymentMethod
+        paymentMethod: data.paymentMethod,
+        verificationToken: verificationToken || undefined,
       } as const;
 
-      const useGuestFlow = !user && guestMode;
-      const res = await (useGuestFlow ? endpoints.createGuestOrder(payload) : endpoints.createOrder(payload));
+      const res = await (useGuestFlow
+        ? endpoints.createGuestOrder(payload, captchaToken || undefined)
+        : endpoints.createOrder(payload));
+      if (useGuestFlow && requireCaptcha) {
+        setCaptchaToken(null);
+        setCaptchaRefreshKey((key) => key + 1);
+      }
       type CreateResponse = {
         orderId: string;
         status: string;
@@ -177,6 +362,9 @@ export default function CheckoutPage() {
         const expiresAt = typeof created.expiresAt === 'string' ? created.expiresAt : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
         rememberGuestSession({ orderId: created.orderId, token: tokenFromResponse, expiresAt });
         setActiveGuestToken(tokenFromResponse);
+      }
+      if (useGuestFlow) {
+        resetVerificationState();
       }
   const sessionToken = useGuestFlow ? (tokenFromResponse || activeGuestToken) : null;
       setOrderId(created.orderId);
@@ -296,6 +484,10 @@ export default function CheckoutPage() {
       const m = Array.isArray(msg) ? msg.join('\n') : (typeof msg === 'string' ? msg : null);
       const fallback = (e && e.message) ? e.message : 'Failed to create order. Please try again.';
       setError(m || fallback);
+      if (useGuestFlow && requireCaptcha) {
+        setCaptchaToken(null);
+        setCaptchaRefreshKey((key) => key + 1);
+      }
     } finally {
       setCreating(false);
     }
@@ -344,15 +536,65 @@ export default function CheckoutPage() {
         </p>
         <h1 id="checkout-heading" className="text-xl font-semibold">Checkout</h1>
         {!user && guestMode && (
-          <div className="rounded border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
-            <p className="text-gray-700">Guest checkout active. We will issue a secure session token after you place the order. Sessions expire automatically after two hours.</p>
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => navigate('/checkout/start')}
-            >
-              Change Checkout Method
-            </button>
+          <div className="space-y-3">
+            <div className="rounded border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
+              <p className="text-gray-700">Guest checkout active. We will issue a secure session token after you place the order. Sessions expire automatically after two hours.</p>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => navigate('/checkout/start')}
+              >
+                Change Checkout Method
+              </button>
+            </div>
+            {requireCaptcha && (
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm space-y-2">
+                <p className="text-amber-700">Complete the captcha to unlock verification and checkout.</p>
+                <CaptchaGate siteKey={captchaSiteKey} refreshKey={captchaRefreshKey} onToken={setCaptchaToken} />
+                {!captchaToken && <p className="text-xs text-amber-600">Token required for secure guest actions.</p>}
+              </div>
+            )}
+            <div className="rounded border border-slate-200 bg-white p-3 text-sm space-y-3">
+              <div className="flex flex-col gap-2">
+                <span className="font-medium text-slate-700">Verify your contact</span>
+                <p className="text-xs text-slate-500">For now we deliver guest OTP codes by email only. Enter your email address below, request the code, and confirm it before checkout.</p>
+              </div>
+              {verificationMessage && <p className="text-xs text-emerald-600">{verificationMessage}</p>}
+              {verificationError && <p className="text-xs text-red-600">{verificationError}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-outline text-xs"
+                  onClick={handleSendVerification}
+                  disabled={verificationStatus === 'sending'}
+                >
+                  {verificationStatus === 'sending' ? 'Sending…' : 'Send Verification Code'}
+                </button>
+                {verificationStatus === 'code-sent' && verificationSecondsRemaining !== null && verificationSecondsRemaining > 0 && (
+                  <span className="text-xs text-slate-500">Code expires in {verificationSecondsRemaining}s</span>
+                )}
+                {verificationStatus === 'verified' && <span className="text-xs text-emerald-600">Verified</span>}
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="border rounded p-2 w-32 text-center tracking-widest uppercase"
+                  placeholder="OTP"
+                  value={verificationCode}
+                  onChange={(event) => setVerificationCode(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn-primary text-xs"
+                  onClick={handleConfirmVerification}
+                  disabled={verificationStatus !== 'code-sent'}
+                >
+                  {verificationStatus === 'verifying' ? 'Verifying…' : 'Confirm Code'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -366,6 +608,14 @@ export default function CheckoutPage() {
         {errors.name && <p className="text-red-600 text-sm">Name is required</p>}
   <input className="border rounded p-2 w-full" placeholder="Phone" type="tel" {...register('phone')} />
   {errors.phone && <p className="text-red-600 text-sm">{errors.phone.message || 'Valid Thai phone is required'}</p>}
+    <input
+      className="border rounded p-2 w-full"
+      placeholder={!user && guestMode ? 'Email (required for verification)' : 'Email (optional)'}
+      type="email"
+      required={!user && guestMode}
+      {...register('email')}
+    />
+    {errors.email && <p className="text-red-600 text-sm">{String(errors.email.message || 'Please enter a valid email address')}</p>}
   <textarea className="border rounded p-2 w-full" placeholder={deliveryMethod === 'pickup' ? 'Address (optional for pickup)' : 'Address'} {...register('address')} />
   {errors.address && <p className="text-red-600 text-sm">{String(errors.address.message || 'Address is required for delivery')}</p>}
         <div className="flex gap-4">

@@ -132,7 +132,7 @@ Required env (subset):
 ```
 BUILT_IN_ADMIN_PASSWORD=Me4medigap!
 PORT=4000
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
+DATABASE_URL=postgresql://pizza:PizzaDev%232025%21@localhost:5432/epic_pizza_dev?schema=public
 JWT_PRIVATE_KEY=... (escaped PEM) 
 JWT_PUBLIC_KEY=... (escaped PEM)
 JWT_ACCESS_TTL=900s

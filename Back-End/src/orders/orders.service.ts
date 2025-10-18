@@ -12,6 +12,7 @@ import { estimateTravelMinutes } from '../utils/maps';
 import { sendOrderEmail, sendEmail } from '../utils/email';
 import { OrdersEvents } from './orders.events';
 import { OrdersPrintService } from './orders.print';
+import { OrdersNotificationService } from './orders.notification';
 import { normalizeThaiPhone } from '../utils/phone';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class OrdersService {
   constructor(
     private readonly events: OrdersEvents,
     @Inject(OrdersPrintService) private readonly printer: OrdersPrintService,
+    @Inject(OrdersNotificationService) private readonly notifications: OrdersNotificationService,
   ) {}
   // In-memory guard to avoid duplicate Google Sheets appends per order id (process lifetime)
   private appendedOrderIds = new Set<string>();
@@ -264,10 +266,12 @@ export class OrdersService {
       created = await prisma.order.create({
         data: {
           customerName: dto.customer.name,
+          customerEmail: dto.customer.email || undefined,
           phone: normalizeThaiPhone(dto.customer.phone),
           address: addrInput || 'PICKUP',
           lat: dto.customer.lat,
           lng: dto.customer.lng,
+          lineUserId: dto.customer.lineId || undefined,
           subtotal,
           deliveryFee,
           tax,
@@ -367,6 +371,16 @@ export class OrdersService {
 
     const order = await this.get(created.id);
 
+    if (order) {
+      void this.notifications.notifyOrderCreated(order as any, {
+        origin: userId ? 'account' : 'guest',
+        emailOverride: dto.customer.email,
+        lineOverride: dto.customer.lineId,
+        paymentMethod: dto.paymentMethod,
+        paymentStatus: order?.payment?.status ?? null,
+      });
+    }
+
     // Enqueue Google Sheets append ONCE (idempotent via Set) right after create
     if (order && process.env.GOOGLE_SHEET_ID && !this.appendedOrderIds.has(order.id)) {
       this.appendedOrderIds.add(order.id);
@@ -455,19 +469,23 @@ export class OrdersService {
   async get(id: string) {
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { items: true },
+      include: { items: true, User: { select: { email: true, lineUserId: true, name: true } } },
     });
     return this.attachPayment(order);
   }
 
   async cancel(id: string) {
     const order = await prisma.order.update({ where: { id }, data: { status: 'cancelled' } });
+    let refundStatus: string | null = null;
     // Attempt refund if payment exists and is pending/unpaid
     try {
-  const payment = await this.fetchPayment(id);
+      const payment = await this.fetchPayment(id);
       if (payment && ['pending','unpaid'].includes(payment.status)) {
         await prisma.payment.update({ where: { orderId: id }, data: { status: 'refunded', paidAt: null as any } });
         await prisma.webhookEvent.create({ data: { type: 'payment.refund.simulated', payload: { orderId: id } as any } });
+        refundStatus = 'refunded';
+      } else if (payment?.status) {
+        refundStatus = payment.status;
       }
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -491,11 +509,17 @@ export class OrdersService {
         baseDelayMs: 1500,
       });
     }
+    if (order) {
+      void this.notifications.notifyOrderCancelled(order as any, {
+        refundStatus,
+        paymentStatus: refundStatus,
+      });
+    }
     return order;
   }
   
   async confirmDelivered(id: string) {
-    const order = await prisma.order.update({ where: { id }, data: { status: 'delivered', deliveredAt: new Date() } as any });
+  const order = await prisma.order.update({ where: { id }, data: { status: 'delivered', deliveredAt: new Date() } as any });
     try { this.events?.emit(order.id, 'order.status', { status: order.status }); } catch {}
     if (process.env.GOOGLE_SHEET_ID) {
       enqueue({
@@ -515,6 +539,9 @@ export class OrdersService {
         baseDelayMs: 1500,
       });
     }
+    if (order) {
+      void this.notifications.notifyOrderStatus(order as any);
+    }
     return order;
   }
 
@@ -524,7 +551,7 @@ export class OrdersService {
     const data: any = { status };
     if (driverName) data.driverName = driverName;
     if (status === 'delivered') data.deliveredAt = new Date();
-  const order = await prisma.order.update({ where: { id }, data });
+    const order = await prisma.order.update({ where: { id }, data });
   try { this.events?.emit(order.id, 'order.status', { status: order.status, driverName: (order as any).driverName }); } catch {}
     // Auto-print when an order is confirmed/received
     if (status === 'received') {
@@ -547,6 +574,9 @@ export class OrdersService {
         maxRetries: 5,
         baseDelayMs: 1500,
       });
+    }
+    if (order) {
+      void this.notifications.notifyOrderStatus(order as any);
     }
     return order;
   }

@@ -9,8 +9,9 @@ describe('OrdersService printing integration', () => {
     const enqueueSpy = vi.spyOn(printer, 'enqueuePrint').mockImplementation(() => {})
   // Mock prisma update
   vi.spyOn(prisma.order as any, 'update').mockResolvedValue({ id: 'o1', status: 'received' } as any)
+    const notifications = { notifyOrderStatus: vi.fn(), notifyOrderCancelled: vi.fn(), notifyOrderCreated: vi.fn(), notifyPaymentUpdate: vi.fn() } as any
 
-    const svc = new OrdersService(undefined as any, printer)
+    const svc = new OrdersService(undefined as any, printer, notifications)
     await svc.updateStatus('o1', 'received')
     expect(enqueueSpy).toHaveBeenCalledWith('o1')
   })

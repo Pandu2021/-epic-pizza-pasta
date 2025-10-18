@@ -18,7 +18,7 @@ type VerificationRequest = {
   verificationExpiresAt?: number;
 };
 
-type VerificationResult = {
+export type VerificationResult = {
   channel: GuestVerificationChannel;
   target: string;
   verifiedAt: Date;
@@ -44,6 +44,9 @@ export class GuestVerificationService implements OnModuleDestroy {
 
   async request(body: { channel: GuestVerificationChannel; target: string }) {
     const channel = body.channel;
+    if (channel === 'phone') {
+      throw new BadRequestException('Phone/WhatsApp verification is temporarily unavailable. Please use email OTP.');
+    }
     const normalizedTarget = this.normalizeTarget(channel, body.target);
     if (!normalizedTarget) {
       throw new BadRequestException('Invalid verification target');

@@ -6,7 +6,7 @@ type OrderRecord = NonNullable<Awaited<ReturnType<typeof prisma.order.findUnique
 type UserRecord = NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>;
 
 describe('OrdersService access control helpers', () => {
-  const service = new OrdersService({} as any, {} as any);
+  const service = new OrdersService({} as any, {} as any, {} as any);
 
   beforeEach(() => {
     vi.restoreAllMocks();

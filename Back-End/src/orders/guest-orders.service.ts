@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import type { VerificationResult } from './guest-verification.service';
 
 type GuestOrderSession = {
   token: string;
@@ -9,6 +10,11 @@ type GuestOrderSession = {
   createdAt: number;
   expiresAt: number;
   lastKnownStatus?: string;
+  email?: string | null;
+  phone?: string | null;
+  lineUserId?: string | null;
+  verifiedChannel?: VerificationResult['channel'];
+  verifiedAt?: number;
 };
 
 type GuestOrderSummary = {
@@ -28,13 +34,26 @@ type GuestOrderSummary = {
     qrPayload?: string | null;
     status?: string | null;
   } | null;
-  items: Array<{ name: string; qty: number; price: number }>;
+  items: Array<{
+    id: string;
+    name: string;
+    nameSnapshot?: string;
+    qty: number;
+    price: number;
+    priceSnapshot?: number;
+  }>;
   customer: {
     deliveryType: string | null;
     phoneMasked: string | null;
     nameMasked: string | null;
+    emailMasked: string | null;
+    lineMasked: string | null;
   };
   expiresAt: string;
+  verification?: {
+    channel: VerificationResult['channel'];
+    verifiedAt: string;
+  } | null;
 };
 
 const DEFAULT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -56,7 +75,7 @@ export class GuestOrdersService implements OnModuleDestroy {
     if (typeof this.cleanupHandle.unref === 'function') this.cleanupHandle.unref();
   }
 
-  async createGuestOrder(dto: CreateOrderDto) {
+  async createGuestOrder(dto: CreateOrderDto, options?: { verification?: VerificationResult | null }) {
     const order = await this.orders.create(dto);
     if (!order?.id) {
       throw new NotFoundException('Failed to create order');
@@ -70,6 +89,11 @@ export class GuestOrdersService implements OnModuleDestroy {
       createdAt: now,
       expiresAt,
       lastKnownStatus: order.status ?? undefined,
+      email: dto.customer.email || null,
+      phone: dto.customer.phone || null,
+      lineUserId: dto.customer.lineId || null,
+      verifiedChannel: options?.verification?.channel,
+      verifiedAt: options?.verification ? options.verification.verifiedAt.getTime() : undefined,
     });
     return {
       guestToken: token,
@@ -128,6 +152,15 @@ export class GuestOrdersService implements OnModuleDestroy {
       : null;
     const expectedReadyAt = order?.expectedReadyAt ? new Date(order.expectedReadyAt).toISOString() : null;
     const expectedDeliveryAt = order?.expectedDeliveryAt ? new Date(order.expectedDeliveryAt).toISOString() : null;
+    const phoneRaw = order?.phone ?? session.phone ?? null;
+    const emailRaw = order?.customerEmail ?? session.email ?? null;
+    const lineRaw = order?.lineUserId ?? session.lineUserId ?? null;
+    const verification = session.verifiedChannel && session.verifiedAt
+      ? {
+          channel: session.verifiedChannel,
+          verifiedAt: new Date(session.verifiedAt).toISOString(),
+        }
+      : null;
     return {
       orderId: order?.id ?? session.orderId,
       status: order?.status ?? session.lastKnownStatus ?? null,
@@ -153,10 +186,13 @@ export class GuestOrdersService implements OnModuleDestroy {
         : [],
       customer: {
         deliveryType: order?.deliveryType ?? null,
-        phoneMasked: this.maskPhone(order?.phone ?? null),
+        phoneMasked: this.maskPhone(phoneRaw),
         nameMasked: this.maskName(order?.customerName ?? null),
+        emailMasked: this.maskEmail(emailRaw),
+        lineMasked: this.maskLine(lineRaw),
       },
       expiresAt: new Date(session.expiresAt).toISOString(),
+      verification,
     };
   }
 
@@ -174,5 +210,25 @@ export class GuestOrdersService implements OnModuleDestroy {
     if (!trimmed) return null;
     if (trimmed.length <= 2) return `${trimmed[0]}*`;
     return `${trimmed[0]}${'*'.repeat(trimmed.length - 2)}${trimmed[trimmed.length - 1]}`;
+  }
+
+  private maskEmail(email: string | null): string | null {
+    if (!email) return null;
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) return null;
+    const [local, domain] = trimmed.split('@');
+    if (!local) return `*@${domain || '***'}`;
+    if (local.length <= 2) {
+      return `${local[0] ?? '*'}*@${domain}`;
+    }
+    return `${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}@${domain}`;
+  }
+
+  private maskLine(lineId: string | null): string | null {
+    if (!lineId) return null;
+    const trimmed = lineId.trim();
+    if (!trimmed) return null;
+    if (trimmed.length <= 3) return `${trimmed[0] ?? '*'}**`;
+    return `${trimmed.slice(0, 2)}***${trimmed.slice(-1)}`;
   }
 }

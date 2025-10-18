@@ -6,6 +6,7 @@ import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { OrdersEvents } from './orders/orders.events';
 import { OrdersPrintService } from './orders/orders.print';
+import { OrdersNotificationService } from './orders/orders.notification';
 import { PaymentsController } from './payments/payments.controller';
 import { MenuController } from './menu/menu.controller';
 import { AdminMenuController } from './admin/menu.controller';
@@ -17,6 +18,8 @@ import { AuthController } from './auth/auth.controller';
 import { GuestOrdersService } from './orders/guest-orders.service';
 import { GuestOrdersCleanupMiddleware } from './orders/guest-orders.cleanup.middleware';
 import { GuestVerificationService } from './orders/guest-verification.service';
+import { CaptchaService } from './common/security/captcha.service';
+import { GuestOrdersRetentionService } from './orders/guest-orders.retention.service';
 
 @Module({
   imports: [
@@ -76,7 +79,17 @@ import { GuestVerificationService } from './orders/guest-verification.service';
     EstimateController,
     AuthController,
   ],
-  providers: [OrdersService, OrdersEvents, OrdersPrintService, GuestOrdersService, GuestOrdersCleanupMiddleware, GuestVerificationService],
+  providers: [
+    OrdersService,
+    OrdersEvents,
+    OrdersPrintService,
+    OrdersNotificationService,
+    GuestOrdersService,
+    GuestOrdersCleanupMiddleware,
+    GuestVerificationService,
+    CaptchaService,
+    GuestOrdersRetentionService,
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -35,6 +35,10 @@ export class CustomerDto {
   @IsEmail()
   email?: string;
 
+  @IsOptional()
+  @IsString()
+  lineId?: string;
+
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }) => (typeof value === 'string' ? value.replace(/[\s-]/g, '') : value))

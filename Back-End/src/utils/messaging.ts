@@ -4,6 +4,10 @@ type MessageResult = { ok: boolean; error?: string; responseStatus?: number };
 type WhatsAppParams = { to: string; body: string; mediaUrl?: string };
 type LineParams = { to: string; body: string };
 
+const IS_TWILIO_MOCK = String(process.env.TWILIO_MOCK || '')
+  .trim()
+  .toLowerCase() === 'true' || process.env.NODE_ENV === 'test';
+
 function normalizeE164Phone(input: string): string | null {
   if (!input) return null;
   const trimmed = input.trim();
@@ -13,8 +17,15 @@ function normalizeE164Phone(input: string): string | null {
   if (sanitized.startsWith('+')) {
     return sanitized;
   }
-  const defaultCountry = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '').trim();
-  if (!defaultCountry.startsWith('+')) {
+  let defaultCountry = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '').trim();
+  if (!defaultCountry && IS_TWILIO_MOCK) {
+    const fallback = (process.env.TWILIO_MOCK_COUNTRY_CODE || '+66').trim();
+    const digits = fallback.startsWith('+') ? fallback.slice(1) : fallback.replace(/[^\d]/g, '');
+    if (digits) {
+      defaultCountry = `+${digits}`;
+    }
+  }
+  if (!defaultCountry || !defaultCountry.startsWith('+')) {
     return null;
   }
   const withoutLeadingZero = sanitized.replace(/^0+/, '');
@@ -28,23 +39,32 @@ function ensureWhatsAppAddress(value: string): string {
   return value.startsWith('whatsapp:') ? value : `whatsapp:${value}`;
 }
 
+function mockWhatsAppResult(reason: string, to: string, body: string): MessageResult {
+  if (!IS_TWILIO_MOCK) {
+    return { ok: false, error: reason };
+  }
+  const snippet = body.length > 140 ? `${body.slice(0, 137)}...` : body;
+  console.info('[messaging] Twilio mock send', { to, reason, body: snippet });
+  return { ok: true, responseStatus: 200 };
+}
+
 export async function sendWhatsAppMessage({ to, body, mediaUrl }: WhatsAppParams): Promise<MessageResult> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_WHATSAPP_FROM;
 
   if (!accountSid || !authToken || !from) {
-    return { ok: false, error: 'WhatsApp messaging not configured' };
+    return mockWhatsAppResult('WhatsApp messaging not configured', to, body);
   }
 
   const normalizedTo = normalizeE164Phone(to);
   const normalizedFrom = normalizeE164Phone(from) || from.trim();
 
   if (!normalizedTo) {
-    return { ok: false, error: 'Invalid WhatsApp recipient number' };
+    return mockWhatsAppResult('Invalid WhatsApp recipient number', to, body);
   }
   if (!normalizedFrom) {
-    return { ok: false, error: 'Invalid WhatsApp sender number' };
+    return mockWhatsAppResult('Invalid WhatsApp sender number', to, body);
   }
 
   const params = new URLSearchParams();

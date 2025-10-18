@@ -70,6 +70,7 @@ model Order {
   id            String      @id @default(uuid())
   userId        String?
   customerName  String
+  customerEmail String?
   phone         String
   address       String
   lat           Float?
@@ -85,6 +86,7 @@ model Order {
   status        String      @default("received")
   deliveryType  String      @default("delivery")
   distanceKm    Float?
+  lineUserId    String?
   expectedReadyAt     DateTime?
   expectedDeliveryAt  DateTime?
   deliveredAt         DateTime?

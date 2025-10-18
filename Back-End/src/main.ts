@@ -44,6 +44,8 @@ import * as express from 'express';
 import crypto from 'crypto';
 import { ensureBuiltInAdminAccounts } from './auth/admin-accounts';
 import { waitForDatabaseConnection } from './prisma';
+import { CaptchaService } from './common/security/captcha.service';
+import { createCaptchaMiddleware } from './common/security/captcha.middleware';
 
 function cryptoRandomId() {
   return crypto.randomBytes(12).toString('hex');
@@ -100,6 +102,11 @@ async function bootstrap() {
       legacyHeaders: false,
     }),
   );
+
+  const captchaService = app.get(CaptchaService);
+  const captchaMiddleware = createCaptchaMiddleware(captchaService);
+  app.use('/api/orders/guest', captchaMiddleware);
+  app.use('/api/orders/guest/verification/request', captchaMiddleware);
 
   // Tighter rate limits for auth endpoints
   const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
